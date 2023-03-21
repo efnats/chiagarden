@@ -1,0 +1,2 @@
+#!/bin/bash
+find /dev/disk/by-label -name "CHIA*" -exec udisksctl mount -b {} -o rw,noatime \;

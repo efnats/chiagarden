@@ -1,0 +1,11 @@
+[Unit]
+Description=(un)mount all chia-labelled drives
+
+[Service]
+RemainAfterExit=yes
+Type=oneshot
+ExecStart=/usr/local/bin/chia-mountall
+ExecStop=/usr/local/bin/chia-unmountall
+
+[Install]
+WantedBy=multi-user.target

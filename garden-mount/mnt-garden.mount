@@ -1,0 +1,14 @@
+[Unit]
+Description = Mount mergerfs volume from chia-labelled disks
+Requires = mount-chia-drives.service
+After = mount-chia-drives.service
+
+[Mount]
+What = /media/root/*
+Where = /mnt/garden
+Type = fuse.mergerfs
+#Options = defaults,allow_other,direct_io,use_ino,fsname=mergerfs,minfreespace=50G,func.getattr=newest
+Options = use_ino,cache.files=full,minfreespace=102G,moveonenospc=true,dropcacheonclose=true,allow_other,fsname=chiapool,category.create=mfs
+
+[Install]
+WantedBy = default.target
