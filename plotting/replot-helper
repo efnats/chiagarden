@@ -1,0 +1,92 @@
+#!/bin/bash
+
+chiadisks_mountpoint="/media/root"
+min_free_space=100 # minimum free space in GB
+min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
+plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1*.plot' 'plot-k32-c2*.plot' 'plot-k32-c3*.plot' 'plot-k32-c4*.plot' 'plot-k32-c5*.plot' 'plot-k32-c6*.plot' 'plot-k32-c7*.plot' 'plot-k32-c8*.plot')
+replot_levels="0,1,2,3,4,5,6" # comma-separated list of plot_pattern indices to be removed
+amount_free_disks=10 # desired amount of disks with min_free_space
+interval=30
+
+IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
+
+while true; do
+  clear
+
+ # Count the number of disks in /media/root/CHIA-*
+ disk_count=$(find /media/root -maxdepth 1 -type d -name "CHIA-*" | wc -l)
+
+echo "Watching a total of $disk_count disks" 
+echo "$amount_free_disks disks each required to have $min_free_space GB free space"
+
+#  echo "Current disk usage:"
+#  duf "$chiadisks_mountpoint"/CHIA-*
+#  echo
+
+  free_disks=()
+
+
+  for disk in "$chiadisks_mountpoint"/CHIA-*; do
+    free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
+    if [ "$free_space" -ge "$min_free_space_bytes" ]; then
+      free_disks+=("$disk")
+    fi
+  done
+
+  echo
+#  echo "The following $(echo "${#free_disks[@]}") disks have at least $min_free_space GB free space:"
+    echo "Disks that meet the requirements:"
+#  echo "The following disks have at least $min_free_space GB free space:"
+#  for disk in "${free_disks[@]}"; do
+#    echo "$disk"
+#  done
+  duf ${free_disks[@]}
+  echo
+
+  while [ "${#free_disks[@]}" -lt "$amount_free_disks" ]; do
+    plot_found=false
+
+    for plot_pattern_index in "${replot_levels_arr[@]}"; do
+      plot_pattern="${plot_patterns[$plot_pattern_index]}"
+      least_free_space_disk=""
+      oldest_file=""
+
+      for disk in "$chiadisks_mountpoint"/CHIA-*; do
+        matching_files=$(find "$disk" -maxdepth 2 -name "$plot_pattern")
+
+        if [ -n "$matching_files" ]; then
+          free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
+          if [ "$free_space" -lt "$min_free_space_bytes" ]; then
+            least_free_space_disk="$disk"
+            oldest_file=$(find "$disk" -maxdepth 2 -name "$plot_pattern" -printf '%T@ %p\n' | sort | head -n 1 | cut -d ' ' -f 2)
+            break
+          fi
+        fi
+      done
+
+      if [ -n "$oldest_file" ]; then
+        echo "removing $oldest_file" #(pattern: $plot_pattern) from $least_free_space_disk"
+        chattr -i "$oldest_file"
+        rm -v "$oldest_file"
+        echo
+        plot_found=true
+      fi
+
+      if [ "$plot_found" == true ]; then
+        break
+      fi
+    done
+
+    free_disks=()
+
+    for disk in "$chiadisks_mountpoint"/CHIA-*; do
+      free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
+      if [ "$free_space" -ge "$min_free_space_bytes" ]; then
+        free_disks+=("$disk")
+      fi
+    done
+done
+
+echo "No more plots need to be removed for now."
+sleep $interval
+done

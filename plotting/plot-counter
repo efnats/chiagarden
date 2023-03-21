@@ -1,0 +1,96 @@
+#!/bin/bash
+
+##################################
+# Variables
+##################################
+
+interval=120 #rescan every xx seconds
+chiadisks_mount=/media/root #mountpoint of chia disks
+chiadisks_label=CHIA- #leave to "" for no chiadisk specific labelling
+
+
+
+
+
+##################################
+### DO NOT CHANGE AFTER THIS LINE
+##################################
+
+
+
+# Loop indefinitely
+while true
+do
+    # Clear the terminal screen
+    clear
+    echo "Counting plots in $chiadisks_mount/$chiadisks_label*"
+    echo
+    # Initialize an array with the patterns to search for
+    patterns=(
+        'plot-k32-20*.plot'
+        'plot-k32-c1*.plot'
+        'plot-k32-c2*.plot'
+        'plot-k32-c3*.plot'
+        'plot-k32-c4*.plot'
+        'plot-k32-c5*.plot'
+        'plot-k32-c6*.plot'
+        'plot-k32-c7*.plot'
+        'plot-k32-c8*.plot'
+        'plot-k32-c9*.plot'
+    )
+
+    # Initialize an array to store the total counts and sizes
+    counts=()
+    sizes=()
+
+    # Loop through all disks that begin with CHIA- mounted in /media/root
+    for disk in $chiadisks_mount/$chiadisks_label*
+    do
+        # Check if the disk is mounted and accessible
+        if [ -d "$disk" ]
+        then
+            # Loop through all patterns and count the number of files matching each pattern
+            for i in "${!patterns[@]}"
+            do
+                count=$(find "$disk" -maxdepth 10 -name "${patterns[$i]}" | wc -l)
+
+                # Add the count to the corresponding element in the counts array
+                counts[$i]=$((counts[$i] + count))
+
+                # Calculate the size of the files matching the pattern in TiB
+                size=$(find "$disk" -maxdepth 10 -name "${patterns[$i]}" -printf '%s\n' | awk '{s+=$1} END {print s/1024/1024/1024/1024}')
+                
+                # Add the size to the corresponding element in the sizes array
+                sizes[$i]=$(awk -v size="${sizes[$i]:-0}" -v new_size="$size" 'BEGIN {print size+new_size}')
+            done
+        fi
+    done
+
+    # Print the table header
+    printf "%-5s %12s %12s\n" "Plot" "Count" "TiB"
+    printf "===================================\n"
+
+    # Print the total counts and sizes for each C-part pattern
+    total_plots=0
+    total_size=0
+    for i in {0..9}
+    do
+        count="${counts[$i]}"
+        plot="C$i"
+        if [ $i -eq 0 ]
+        then
+            plot="C0"
+        fi
+        size="${sizes[$i]:-0}"
+        printf "%-5s %12s %12s\n" "$plot:" "$count" "$(printf '%.2f' "$size")"
+        total_plots=$((total_plots + count))
+        total_size=$(awk -v total_size="$total_size" -v new_size="$size" 'BEGIN {print total_size+new_size}')
+    done
+
+    # Print the total number of plots and size in TiB
+    printf "===================================\n"
+    printf "%-5s %12s %12s\n" "Total" "$total_plots" "$(printf '%.2f' "$total_size")"
+
+    # Sleep for the specified interval before repeating the loop
+    sleep "$interval"
+done
