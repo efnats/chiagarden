@@ -8,8 +8,6 @@ ChiaInit is a bash script that helps you prepare and manage hard drives for PoST
 - Format drives with xfs, ext4, or ntfs filesystems
 - Label drives with custom prefixes
 - Initialize drives (wipe, format, and label)
-- Summarize and confirm actions before execution
-- Skip system drives automatically
 
 ## Requirements
 
