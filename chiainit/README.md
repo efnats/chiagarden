@@ -19,7 +19,6 @@ ChiaInit is a bash script that helps you prepare and manage hard drives for PoST
 
 ## Usage
 <pre>
-```bash
 Usage: chiainit [OPTIONS] drive1 drive2 ... driveN
 Example: chiainit --fstype ext4 --init sdb sdc
 
