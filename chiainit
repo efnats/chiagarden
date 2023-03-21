@@ -1,0 +1,325 @@
+#!/bin/bash
+
+#requirements
+#xfsprogs, smartmontools, ntfs-3g
+
+XFSOPTIONS="-f -b size=1024"
+EXT4OPTIONS="-F -m 0 -T largefile4"
+NTFSOPTIONS="-f"
+SERIALPREFIX="CHIA"
+
+# Add color variables and bold
+GREEN="\033[32m"
+YELLOW="\033[33m"
+CYAN="\033[36m"
+RED="\033[31m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+VERSION="V2"
+
+# Function to check if a drive has a root partition
+is_system_drive() {
+    drive=$1
+    root_partition=$(df --output=source / | tail -1)
+    echo $root_partition | grep -q "^/dev/${drive}"
+    return $?
+}
+
+# Function to retrieve the serial number of a drive
+get_serial_number() {
+    drive=$1
+    serial_number=$(sudo smartctl -i /dev/$drive | grep -i "Serial Number" | awk  '{ print $3 }')
+    echo "$serial_number"
+}
+
+# Function to get the label of a drive
+get_label() {
+    partition=$1
+
+    case "$FSTYPE" in
+        xfs)
+            label=$(sudo xfs_admin -l /dev/$partition 2>/dev/null | awk '{print $3}')
+            ;;
+        ext4)
+            label=$(sudo e2label /dev/$partition 2>/dev/null)
+            ;;
+        ntfs)
+            label=$(sudo ntfslabel /dev/$partition 2>/dev/null)
+            ;;
+    esac
+    echo "$label"
+}
+
+# Confirm destructive actions
+confirm_destructive_action() {
+    drives=$@
+    echo -e "${RED}WARNING:${RESET} You have selected a destructive action (wipe, format, or init)."
+    echo -e "${BOLD}THIS WILL DESTROY ALL YOUR DATA ON THE SPECIFIED DRIVE(S).${RESET}"
+    for drive in "${drives[@]}"; do
+        echo -e "${BOLD}${CYAN}$drive${RESET}"
+    done
+    echo ""
+    echo "To proceed, type 'YES I SACRIFICE THIS DATA' and press Enter."
+    read confirmation
+    if [ "$confirmation" != "YES I SACRIFICE THIS DATA" ]; then
+        echo "Operation canceled."
+        exit 0
+    fi
+}
+
+
+
+# Summarize actions
+summarize_actions() {
+    affected_drives=""
+    for drive in "${DRIVES[@]}"; do
+        if is_system_drive "$drive"; then
+            echo -e "${YELLOW}Skipping /dev/$drive (system drive).${RESET}"
+        else
+            affected_drives+="$drive, "
+        fi
+    done
+    affected_drives=${affected_drives%, }
+
+    #echo "The following actions will be performed:"
+    echo -e "Actions performed: ${BOLD}${ACTION#--}${RESET}"
+    echo -e "Drives affected  : ${BOLD}$affected_drives${RESET}"
+    echo
+
+    echo "Do you want to continue? (Y/n)"
+    read -r user_choice
+    if [[ ! "$user_choice" =~ ^[Yy]$ ]] && [[ ! -z "$user_choice" ]]; then
+        echo "Operation canceled."
+        exit 0
+    fi
+}
+
+
+
+# Function to label a drive
+label() {
+    drive=$1
+    partition=$2
+    serial_number=$(get_serial_number "$drive")
+    label="${SERIALPREFIX}-${serial_number}"
+    
+    case "$FSTYPE" in
+        xfs)
+            label=$(echo "$label" | cut -c 1-12)
+            sudo xfs_admin -L "$label" /dev/$partition > /dev/null 2>&1
+            ;;
+        ext4)
+            label=$(echo "$label" | cut -c 1-16)
+            sudo e2label /dev/$partition "$label" > /dev/null 2>&1
+            ;;
+        ntfs)
+            label=$(echo "$label" | cut -c 1-32)
+            sudo ntfslabel /dev/$partition "$label" > /dev/null 2>&1
+            ;;
+    esac
+}
+
+# Function to wipe a drive
+wipe() {
+    drive=$1
+    sudo wipefs -a /dev/$drive > /dev/null 2>&1
+}    
+
+# Function to format a drive
+format() {
+    drive=$1
+    if [ -z "$FSTYPE" ]; then
+        return
+    fi
+
+    echo -e "g\nn\n1\n\n\nw" | sudo fdisk /dev/$drive > /dev/null 2>&1
+    partition="${drive}1"
+    if [ "$FSTYPE" == "xfs" ]; then
+        sudo mkfs.xfs ${XFSOPTIONS} /dev/$partition > /dev/null 2>&1
+    elif [ "$FSTYPE" == "ext4" ]; then
+        sudo mkfs.ext4 ${EXT4OPTIONS} /dev/$partition > /dev/null 2>&1
+    elif [ "$FSTYPE" == "ntfs" ]; then
+        sudo mkfs.ntfs ${NTFSOPTIONS} /dev/$partition > /dev/null 2>&1
+    fi
+}    
+
+# Function to initialize a drive (wipe, format, and label)
+init() {
+    drive=$1
+    execute_action "--wipe" $drive
+    execute_action "--format" $drive
+    execute_action "--label" $drive
+}
+
+# Function to display the help text
+help() {
+    display_version
+    display_help
+}
+
+
+# Display help text
+display_help() {
+    echo "Usage: chiainit [OPTIONS] drive1 drive2 ... driveN"
+    echo "Mass-prepare hard drives for PoST farming"
+    echo ""
+    echo "Options:"
+    echo "  --help                    : Show this help text"
+    echo "  --wipe                    : Wipe the specified drives"
+    echo "  --format                  : Format the specified drives (requires --fstype)"
+    echo "  --label                   : Label the specified drives (requires --fstype and --label-prefix)"
+    echo "  --init                    : Wipe, format, and label the specified drives (requires --fstype and --label-prefix)"
+    echo "  --fstype [xfs|ext4|ntfs]  : Specify the filesystem type"
+    echo "  --label-prefix PREFIX     : Specify a custom prefix for the drive labels (default: CHIA)"
+    echo ""
+    echo "Examples:"
+    echo "  chiainit --label sdb sdc"
+    echo "  chiainit --fstype ext4 --init sdb sdc"
+    echo "  chiainit --fstype xfs --format sdb sdc"
+    echo "  chiainit --fstype ext4 --label-prefix FARM --label sdb sdc"
+}
+
+# Display short help text
+display_usage() {
+    echo "Usage: chiainit [OPTIONS] drive1 drive2 ... driveN"
+    echo "Example: chiainit --fstype ext4 --init sdb sdc"
+}
+
+
+display_version() {
+    echo -e "${BOLD}${CYAN}ChiaInit ${VERSION}${RESET}"
+}
+
+
+# Spinner code
+spinner() {
+    local pid=$1
+    local delay=0.05
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+    echo -e "${GREEN}OK${RESET}"
+}
+
+
+# Execute action
+execute_action() {
+    action=$1
+    drive=$2
+
+    case "$action" in
+        --init)
+            echo -e ""
+            echo -ne "${BOLD}${CYAN}Drive /dev/$drive:${RESET}"
+            echo -e ""
+            init $drive &
+            pid=$!
+            #spinner $pid
+            wait $pid
+            #echo -e " OK"
+            ;;
+        --wipe)
+            echo -ne "  ${YELLOW}Wiping /dev/$drive...${RESET}"
+            wipe $drive &
+            pid=$!
+            spinner $pid
+            wait $pid
+            ;;
+        --format)
+            echo -ne "  ${YELLOW}Formatting /dev/$drive...${RESET}"
+            format $drive &
+            pid=$!
+            spinner $pid
+            wait $pid
+            ;;
+        --label)
+            echo -ne "  ${YELLOW}Labeling /dev/${drive}1...${RESET}"
+            label $drive "${drive}1" &
+            pid=$!
+            spinner $pid
+            wait $pid
+            drive_label=$(get_label "${drive}1")
+            echo -e "  ${CYAN}New label: ${RESET}${drive_label}"
+            ;;
+    esac
+}
+
+ACTION=""
+FSTYPE=""
+
+
+# Process the command-line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --wipe|--format|--label|--init)
+            ACTION="$1"
+            shift
+            ;;
+        --fstype)
+            if [ "$2" == "xfs" ] || [ "$2" == "ext4" ] || [ "$2" == "ntfs" ]; then
+                FSTYPE="$2"
+                shift 2
+            else
+                echo "Error: Unsupported filesystem type."
+                display_usage
+                exit 1
+            fi
+            ;;
+        --label-prefix)
+            SERIALPREFIX="$2"
+            shift 2
+            ;;
+        --help)
+            help
+            exit 0
+            ;;
+        *)
+            if [ -z "$ACTION" ]; then
+                display_usage
+                exit 1
+            fi
+            DRIVES+=("$1")
+            shift
+            ;;
+    esac
+done
+
+display_version
+
+if [ -z "$ACTION" ]; then
+    display_help
+    exit 1
+fi
+
+# Confirm destructive actions
+if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; then
+    summarize_actions
+    confirm_destructive_action "${DRIVES[@]}"
+fi
+
+# Check for valid FSystem entry
+if { [ "$ACTION" == "--format" ] || [ "$ACTION" == "--label" ]; } && [ -z "$FSTYPE" ]; then
+    echo "Error: Missing filesystem type for format or label action."
+    display_help
+    exit 1
+fi
+
+# Iterate through the provided arguments and call the corresponding functions based on the action
+for drive in "${DRIVES[@]}"; do
+    if is_system_drive "$drive"; then
+        echo -e "${YELLOW}Skipping /dev/$drive (system drive).${RESET}"
+    else
+        execute_action "$ACTION" $drive
+    fi
+done
+
+echo ""
+echo "Operation complete for all specified drives."
+echo ""
