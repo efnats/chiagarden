@@ -33,7 +33,7 @@ Options
 --label-prefix PREFIX: Specify a custom prefix for the drive labels (default: CHIA)
 </pre>
 
-Contributing
+## Contributing
 If you have suggestions for improvements or bug fixes, please feel free to submit a pull request or create an issue.
 
 ## License
