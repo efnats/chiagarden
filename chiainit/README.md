@@ -18,12 +18,12 @@ ChiaInit is a bash script that helps you prepare and manage hard drives for PoST
 - ntfs-3g
 
 ## Usage
-
+<pre>
 ```bash
 Usage: chiainit [OPTIONS] drive1 drive2 ... driveN
 Example: chiainit --fstype ext4 --init sdb sdc
 
-## Options
+Options
 --help: Show help text
 --wipe: Wipe the specified drives
 --format: Format the specified drives (requires --fstype)
@@ -31,8 +31,9 @@ Example: chiainit --fstype ext4 --init sdb sdc
 --init: Wipe, format, and label the specified drives (requires --fstype and --label-prefix)
 --fstype [xfs|ext4|ntfs]: Specify the filesystem type
 --label-prefix PREFIX: Specify a custom prefix for the drive labels (default: CHIA)
+</pre>
 
-## Contributing
+Contributing
 If you have suggestions for improvements or bug fixes, please feel free to submit a pull request or create an issue.
 
 ## License
