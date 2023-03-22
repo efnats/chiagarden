@@ -1,7 +1,7 @@
 #!/bin/bash
 
 usage() {
-    echo "Usage: $0 [--mount|--unmount] [--label LABEL_PREFIX] [--read-only]"
+    echo "Usage: $0 [--mount|--unmount] [--label LABEL_PREFIX] [--read-only] [--mount-point MOUNT_POINT]"
     echo "Example: $0 --mount --label 'CHIA'"
     exit 1
 }
@@ -13,6 +13,7 @@ fi
 action=""
 label_prefix="CHIA"
 read_only=""
+mount_point=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -32,6 +33,10 @@ while [ "$#" -gt 0 ]; do
             read_only="yes"
             shift
             ;;
+        --mount-point)
+            mount_point="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown argument: $1"
             usage
@@ -46,6 +51,11 @@ fi
 
 label_pattern="${label_prefix}*"
 found_disks=0
+username=$(whoami)
+
+if [ -z "$mount_point" ]; then
+    mount_point="/media/$username"
+fi
 
 if [ "$action" == "mount" ]; then
     mount_options="rw,noatime"
@@ -54,13 +64,21 @@ if [ "$action" == "mount" ]; then
     fi
 
     while IFS= read -r disk; do
-        udisksctl mount -b "$disk" -o "$mount_options"
+        device=$(readlink -f "$disk")
+        disk_mount_point="$mount_point/$(basename "$disk")"
+        mkdir -p "$disk_mount_point"
+        mount -v -o "$mount_options" "$device" "$disk_mount_point"
         found_disks=1
     done < <(find /dev/disk/by-label -name "$label_pattern")
 elif [ "$action" == "unmount" ]; then
     while IFS= read -r disk; do
-        udisksctl unmount -b "$disk"
-        found_disks=1
+        device=$(readlink -f "$disk")
+        mount_info=$(findmnt -n -o SOURCE,TARGET "$device")
+        if [ -n "$mount_info" ]; then
+            read -r mounted_device mounted_path <<<"$mount_info"
+            umount -v "$mounted_device"
+            found_disks=1
+        fi
     done < <(find /dev/disk/by-label -name "$label_pattern")
 else
     echo "Invalid action: '$action'. Use '--mount' or '--unmount'."

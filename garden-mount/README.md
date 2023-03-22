@@ -4,9 +4,7 @@ This script helps you mount or unmount Chia-labelled drives based on a specified
 
 ## Requirements
 
-- Bash shell
-- `udisksctl` command line tool (part of `udisks2` package)
-- systemd (for service management)
+- tested on Ubuntu 20.04+
 
 ## Usage
 
@@ -16,20 +14,27 @@ The script has the following command-line options:
 - `--unmount`: Unmounts the drives with the specified label prefix
 - `--label LABEL_PREFIX`: Specifies the label prefix to use for matching drives (default: CHIA)
 - `--read-only`: Mounts the drives as read-only (only applicable with `--mount`)
+- `--mount-point`: Mounts the drives into this mountpoint (default: /media/[username]))
 
 #### Examples
 
-1. Mount all drives with the label prefix 'CHIA':
+1. Mount all drives with the label prefix 'CHIA' on /media/root (if run as root):
 
 ```bash
 ./chiamount.sh --mount
 ```
 
-2. Mount all drives with the label prefix 'GIGA' as read-only:
+2. Mount all drives with the label prefix 'GIGA' as read-only on /mnt/16TB-drives:
 
 ```bash
-./chiamount.sh --mount --label GIGA --read-only
+./chiamount.sh --mount --label GIGA --read-only --mount-point /mnt/16TB-drives
 ```
+
+3. Unmount all drives withe label CHIA (previously mounted on any mountpoint)
+```bash
+./chiamount.sh --unmount
+```
+
 
 ## Systemd Service Files
 
