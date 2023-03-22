@@ -2,7 +2,7 @@
 
 ChiaInit is a bash script that helps you prepare and manage hard drives for PoST (Proof of Space and Time) farming. It automates the process of wiping, formatting, and labeling multiple drives at once, making it easy to set up and maintain your Chia farming storage.
 Drives are automatically labelled with the pattern CHIA-[Serialnr].
-Other tools in this repo rely on drives labelled in this fashion so they can be identified as CHIA drives.
+Other tools in this repo rely on drives being labelled in this fashion so they can be identified as CHIA drives.
 
 ## Features
 
