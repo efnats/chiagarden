@@ -1,6 +1,6 @@
-# Chia Garden
+# Chiagarden
 
-chiagarden is a collection of tools designed to help you build, manage, and maintain a Chia PoST farm on a linux based system. These tools make it easier to prepare and mount your hard disks, and manage your plots for your PoST farm.
+Chiagarden is a collection of tools designed to help you build, manage, and maintain a Chia PoST farm on a linux based system. These tools make it easier to prepare and mount your hard disks, and manage your plots for your PoST farm.
 
 ## chiainit
 
