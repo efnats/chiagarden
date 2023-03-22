@@ -33,6 +33,12 @@ Options
 --label-prefix PREFIX: Specify a custom prefix for the drive labels (default: CHIA)
 </pre>
 
+## Example
+```bash
+./chiainit --fstype ext4 --init sdx sdy sdz sdaa sdab
+```
+This command will wipe, format (ext4) and label the given drives.
+
 ## Contributing
 If you have suggestions for improvements or bug fixes, please feel free to submit a pull request or create an issue.
 
