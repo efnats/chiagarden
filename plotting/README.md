@@ -1,4 +1,4 @@
-# plot_counter - Display amount of plots for each C-Level
+# plot_counter - Displays amount of plots for each Compression Level
 
 `plot_counter`: A script that counts Chia plots on multiple disks and calculates their total size in TiB (tebibytes). The script will scan mounted disks at a specified interval and display the count and size of plots found for each compression level. The results are displayed in a table format in the terminal.
 
@@ -18,6 +18,33 @@
 2. Save the script and make it executable by running:
 
    - `chmod +x plot_counter`
+
+
+# plot_mover - A simple and user-friendly plot moving script
+
+`plot_mover` is a Bash script that monitors a specified source directory for new Chia plot files and moves them to a specified destination directory using `rsync`.
+
+## Prerequisites
+
+- rsync
+
+## Usage
+
+```bash
+./plot_mover <watch_dir> <dest_dir>
+```
+
+- `<watch_dir>`: The source directory to monitor for new plot files.
+- `<dest_dir>`: The destination directory to move the plot files to.
+
+## Example
+
+```bash
+./plot_mover /mnt/plotting /mnt/garden
+```
+
+This command will monitor the `/mnt/plotting` directory for new plot files and move them to the `/mnt/garden` directory when detected.
+
 
 
 # plot_over - A replot helper
