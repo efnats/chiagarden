@@ -1,4 +1,4 @@
-# chiamount - Chiadisks Mass (un)mounter
+# chiamount - Mass disk (un)mounter for PoST farming
 
 This script helps you mount or unmount Chia-labelled drives based on a specified label prefix. Additionally, this repository provides two systemd service files for managing the mounting and unmounting process.
 
@@ -14,7 +14,7 @@ The script has the following command-line options:
 - `--unmount`: Unmounts the drives with the specified label prefix
 - `--label LABEL_PREFIX`: Specifies the label prefix to use for matching drives (default: CHIA)
 - `--read-only`: Mounts the drives as read-only (only applicable with `--mount`)
-- `--mount-point`: Mounts the drives into this mountpoint (default: /media/[username]))
+- `--mount-point`: Mounts the drives into thes specified mountpoint (default: /media/[username]))
 
 #### Examples
 
@@ -35,10 +35,6 @@ The script has the following command-line options:
 ./chiamount --unmount
 ```
 
-
-## Systemd Service Files
-
-This repository includes two systemd service files for managing the mounting and unmounting of Chia-labelled drives
 
 ## mnt-chia-drives.service
 
@@ -64,6 +60,10 @@ sudo systemctl daemon-reload
 
 # Start the mnt-garden mount
 sudo systemctl start mnt-garden.mount
+
+# enable the service upon next boot (if desired)
+sudo systemctl enable mnt-garden.mount
+sudo systemctl enable mnt-chia.drives.service
 ```
 
 
