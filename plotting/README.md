@@ -53,7 +53,7 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
 
 ## Requirements
 
-- Bash shell
+- duf-utility https://github.com/muesli/duf
 - The script assumes that your Chia plots are stored on mounted disks with a specific label format (e.g., CHIA-).
 
 ## Usage

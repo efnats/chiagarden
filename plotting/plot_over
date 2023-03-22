@@ -1,28 +1,55 @@
 #!/bin/bash
 
+##################################
+#   VARIABLES - adjust these     #
+##################################
+
 chiadisks_mountpoint="/media/root"
 min_free_space=100 # minimum free space in GB
-min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
-plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1*.plot' 'plot-k32-c2*.plot' 'plot-k32-c3*.plot' 'plot-k32-c4*.plot' 'plot-k32-c5*.plot' 'plot-k32-c6*.plot' 'plot-k32-c7*.plot' 'plot-k32-c8*.plot')
+plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1*.plot' 'plot-k32-c2*.plot' 'plot-k32-c3*..plot' 'plot-k32-c4*.plot' 'plot-k32-c5*.plot' 'plot-k32-c6*.plot' 'plot-k32-c7*.plot' 'plot-k32-c8*.plot')
 replot_levels="0,1,2,3,4,5,6" # comma-separated list of plot_pattern indices to be removed
-amount_free_disks=10 # desired amount of disks with min_free_space
+amount_free_disks=5 # desired amount of disks with min_free_space
 interval=30
 
+
+###### nothing to see after this line ###############
+
+# Add color variables and bold
+GREEN="\033[32m"
+YELLOW="\033[33m"
+CYAN="\033[36m"
+RED="\033[31m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+# Parse command-line arguments
+dry_run=false
+
+for arg in "$@"
+do
+  case $arg in
+    --dry-run) dry_run=true; shift ;;
+    *) echo "Usage: $0 [--dry-run] for dry-run mode."; exit 1 ;;
+  esac
+done
+
+
+min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
 IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
 
 while true; do
   clear
 
- # Count the number of disks in /media/root/CHIA-*
+# Count the number of disks in /media/root/CHIA-*
  disk_count=$(find /media/root -maxdepth 1 -type d -name "CHIA-*" | wc -l)
+
 
 echo "Watching a total of $disk_count disks" 
 echo "$amount_free_disks disks each required to have $min_free_space GB free space"
-
-#  echo "Current disk usage:"
-#  duf "$chiadisks_mountpoint"/CHIA-*
-#  echo
-
+  if [ "$dry_run" = true ]; then
+    echo -e "${CYAN}DRY-RUN MODE - NOTHING WILL BE DELETED${RESET}"
+  fi
+ 
   free_disks=()
 
 
@@ -34,12 +61,7 @@ echo "$amount_free_disks disks each required to have $min_free_space GB free spa
   done
 
   echo
-#  echo "The following $(echo "${#free_disks[@]}") disks have at least $min_free_space GB free space:"
     echo "Disks that meet the requirements:"
-#  echo "The following disks have at least $min_free_space GB free space:"
-#  for disk in "${free_disks[@]}"; do
-#    echo "$disk"
-#  done
   duf ${free_disks[@]}
   echo
 
@@ -65,14 +87,19 @@ echo "$amount_free_disks disks each required to have $min_free_space GB free spa
       done
 
       if [ -n "$oldest_file" ]; then
-        echo "removing $oldest_file" #(pattern: $plot_pattern) from $least_free_space_disk"
-        chattr -i "$oldest_file"
-        rm -v "$oldest_file"
+        if [ "$dry_run" = true ]; then
+          echo -e "${CYAN}DRY-RUN${RESET} would remove $oldest_file"
+        else
+          echo "removing $oldest_file"
+          chattr -i "$oldest_file"
+          rm -v "$oldest_file"
+        fi
         echo
         plot_found=true
       fi
 
       if [ "$plot_found" == true ]; then
+        sleep 4
         break
       fi
     done
@@ -85,8 +112,8 @@ echo "$amount_free_disks disks each required to have $min_free_space GB free spa
         free_disks+=("$disk")
       fi
     done
-done
+  done
 
-echo "No more plots need to be removed for now."
-sleep $interval
+  echo "No more plots need to be removed for now."
+  sleep $interval
 done
