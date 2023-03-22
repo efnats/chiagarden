@@ -10,13 +10,34 @@
 ## Usage
 
 ```bash
-./chia_plot_counter.sh <mountpoint_of_chia_disks> [--interval interval_seconds] [--label chia_disks_label]
+./chia_plot_counter <mountpoint_of_chia_disks> [--interval interval_seconds] [--label chia_disks_label]
 ```
 
 ## Options
 
    - `--interval`(optional): rescan interval in seconds (Default: 120 seconds)
    - `--label`: The label for Chia disks to include in the search. Default is "CHIA"
+
+## Examples
+
+1. count all plots in /mnt/plots/CHIA*
+
+```bash
+./chia_plot_counter /mnt/plots
+```
+
+
+2. count all plots in /media/root/GIGA*
+
+```bash
+./chia_plot_counter /media/root --label GIGA
+```
+
+3. count all plots in /mnt/plots/* - no specific label given
+
+```bash
+./chia_plot_counter /mnt/plots --label ""
+```
    
 
 
