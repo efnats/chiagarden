@@ -16,7 +16,7 @@
 ## Options
 
    - `--interval`(optional): rescan interval in seconds (Default: 120 seconds)
-   - `--label`: The label for Chia disksto include in the search. Default is "CHIA"
+   - `--label`: The label for Chia disks to include in the search. Default is "CHIA"
    
 
 

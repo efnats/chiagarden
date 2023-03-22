@@ -4,7 +4,8 @@ This script helps you mount or unmount Chia-labelled drives based on a specified
 
 ## Requirements
 
-- tested on Ubuntu 20.04+
+- mergerfs https://github.com/trapexit/mergerfs
+- have your disks labelled with a unified pattern (see chiainit)
 
 ## Usage
 
