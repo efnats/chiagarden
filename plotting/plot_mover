@@ -1,0 +1,43 @@
+#!/bin/bash
+
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <watch_dir> <dest_dir>"
+    exit 1
+fi
+
+watch_dir="$1" # source directory
+dest_dir="$2"  # destination directory
+#dest_dir='rsync://destination_host:12000/garden' # for use with rsyncd
+
+echo "watching $watch_dir and moving consecutively to $dest_dir"
+
+_move_plot(){
+    local plot
+    plot="$1"
+    echo "---- Detected new plot: $plot"
+    echo moving to "$dest_dir"
+    rsync --preallocate --remove-source-files --skip-compress plot --whole-file --progress "$plot" "$dest_dir"/
+    #	echo -n "Changing attribute to immutable.."
+    #	chattr +i "$dest_dir"/$Filename
+    echo "---- done"
+}
+
+loop(){
+    local filename
+    while true; do
+        filename=$(ls -tr $watch_dir/*.plot 2> /dev/null | head -1)
+        #filename=$(basename -a $watch_dir/plot-k32-*.plot 2> /dev/null | head -1)
+        if [[ $filename != *.plot ]]; then
+            sleep 5
+            continue
+        fi
+        _move_plot $filename
+    done
+}
+loop
+
+# inotifywait -m -e move --format "%f" "$WATCH_DIR" \
+#     | while read Filename
+#        do
+#          _move_plot
+#        done
