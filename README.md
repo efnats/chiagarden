@@ -8,11 +8,11 @@ Chiagarden is a collection of tools designed to help you build, manage, and main
 
 ## garden-mount
 
-[garden-mount](https://github.com/efnats/chiagarden/tree/main/ helps you mount or unmount Chia-labelled drives based on a specified label prefix. Additionally, this repository provides two systemd service files for managing the mounting and unmounting process.
+[garden-mount](https://github.com/efnats/chiagarden/tree/main/) is a script for (un)mounting drives based on a specified label prefix. Additionally, this repository provides systemd service files for managing the mounting and unmounting process.
 
 ## plotting
 
-In [plotting](https://github.com/efnats/chiagarden/tree/main/plotting), you will find scripts for managing and automating the plotting process. These tools make it easier to count, move and replot your PoST plots
+[plotting](https://github.com/efnats/chiagarden/tree/main/plotting) contains various scripts for managing, monitoring and automating the (re)plotting process.
 
 ## Getting Started
 
