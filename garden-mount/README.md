@@ -21,18 +21,18 @@ The script has the following command-line options:
 1. Mount all drives with the label prefix 'CHIA' on /media/root (if run as root):
 
 ```bash
-./chiamount.sh --mount
+./chiamount --mount
 ```
 
 2. Mount all drives with the label prefix 'GIGA' as read-only on /mnt/16TB-drives:
 
 ```bash
-./chiamount.sh --mount --label GIGA --read-only --mount-point /mnt/16TB-drives
+./chiamount --mount --label GIGA --read-only --mount-point /mnt/16TB-drives
 ```
 
 3. Unmount all drives withe label CHIA (previously mounted on any mountpoint)
 ```bash
-./chiamount.sh --unmount
+./chiamount --unmount
 ```
 
 
