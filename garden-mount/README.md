@@ -22,13 +22,13 @@ The script has the following command-line options:
 1. Mount all drives with the label prefix 'CHIA':
 
 ```bash
-./chiamount.sh --mount --label 'CHIA'
+./chiamount.sh --mount
 ```
 
-2. Mount all drives with the label prefix 'CHIA' as read-only:
+2. Mount all drives with the label prefix 'GIGA' as read-only:
 
 ```bash
-./chiamount.sh --mount --label 'CHIA' --read-only
+./chiamount.sh --mount --label GIGA --read-only
 ```
 
 ## Systemd Service Files
