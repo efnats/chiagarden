@@ -1,2 +1,0 @@
-#!/bin/bash
-find /dev/disk/by-label -name "CHIA*" -exec udisksctl unmount -b {} \;

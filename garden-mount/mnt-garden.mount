@@ -1,7 +1,7 @@
 [Unit]
 Description = Mount mergerfs volume from chia-labelled disks
-Requires = mount-chia-drives.service
-After = mount-chia-drives.service
+Requires = mnt-chia-drives.service
+After = mnt-chia-drives.service
 
 [Mount]
 What = /media/root/*

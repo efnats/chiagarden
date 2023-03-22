@@ -1,0 +1,72 @@
+#!/bin/bash
+
+usage() {
+    echo "Usage: $0 [--mount|--unmount] [--label LABEL_PREFIX] [--read-only]"
+    echo "Example: $0 --mount --label 'CHIA'"
+    exit 1
+}
+
+if [ "$#" -lt 1 ]; then
+    usage
+fi
+
+action=""
+label_prefix="CHIA"
+read_only=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --mount)
+            action="mount"
+            shift
+            ;;
+        --unmount)
+            action="unmount"
+            shift
+            ;;
+        --label)
+            label_prefix="$2"
+            shift 2
+            ;;
+        --read-only)
+            read_only="yes"
+            shift
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            usage
+            ;;
+    esac
+done
+
+if [ -z "$action" ]; then
+    echo "Please specify an action: --mount or --unmount"
+    usage
+fi
+
+label_pattern="${label_prefix}*"
+found_disks=0
+
+if [ "$action" == "mount" ]; then
+    mount_options="rw,noatime"
+    if [ "$read_only" == "yes" ]; then
+        mount_options="ro,noatime"
+    fi
+
+    while IFS= read -r disk; do
+        udisksctl mount -b "$disk" -o "$mount_options"
+        found_disks=1
+    done < <(find /dev/disk/by-label -name "$label_pattern")
+elif [ "$action" == "unmount" ]; then
+    while IFS= read -r disk; do
+        udisksctl unmount -b "$disk"
+        found_disks=1
+    done < <(find /dev/disk/by-label -name "$label_pattern")
+else
+    echo "Invalid action: '$action'. Use '--mount' or '--unmount'."
+    exit 1
+fi
+
+if [ "$found_disks" -eq 0 ]; then
+    echo "No disks found with the label pattern: $label_pattern"
+fi

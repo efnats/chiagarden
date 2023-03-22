@@ -4,8 +4,8 @@ Description=(un)mount all chia-labelled drives
 [Service]
 RemainAfterExit=yes
 Type=oneshot
-ExecStart=/usr/local/bin/chia-mountall
-ExecStop=/usr/local/bin/chia-unmountall
+ExecStart=/usr/local/bin/chiamount --mount
+ExecStop=/usr/local/bin/chiamount --unmount
 
 [Install]
 WantedBy=multi-user.target
