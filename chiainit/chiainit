@@ -70,14 +70,18 @@ confirm_destructive_action() {
 
 
 
-# Summarize actions
+## Summarize actions
 summarize_actions() {
     affected_drives=""
+    ntfs_warning=false
     for drive in "${DRIVES[@]}"; do
         if is_system_drive "$drive"; then
             echo -e "${YELLOW}Skipping /dev/$drive (system drive).${RESET}"
         else
             affected_drives+="$drive, "
+            if [ "$FSTYPE" == "ntfs" ]; then
+                ntfs_warning=true
+            fi
         fi
     done
     affected_drives=${affected_drives%, }
@@ -87,6 +91,11 @@ summarize_actions() {
     echo -e "Drives affected  : ${BOLD}$affected_drives${RESET}"
     echo
 
+    if [ "$ntfs_warning" = true ]; then
+        echo -e "${RED}WARNING!!${RESET}${BOLD} There is a potential risk for data corruption when using NTFS-3G for Windows. DONT USE IT FOR YOUR FARM!!${RESET}"
+        echo
+    fi
+
     echo "Do you want to continue? (Y/n)"
     read -r user_choice
     if [[ ! "$user_choice" =~ ^[Yy]$ ]] && [[ ! -z "$user_choice" ]]; then
@@ -94,6 +103,7 @@ summarize_actions() {
         exit 0
     fi
 }
+
 
 
 
@@ -140,6 +150,7 @@ format() {
     elif [ "$FSTYPE" == "ext4" ]; then
         sudo mkfs.ext4 ${EXT4OPTIONS} /dev/$partition > /dev/null 2>&1
     elif [ "$FSTYPE" == "ntfs" ]; then
+        echo -e "${YELLOW}Warning:${RESET} Formatting with NTFS using the ntfs-3g driver in Linux may endanger the integrity of your data. It is highly discouraged!! If you are a Windows user, consider using ext4 for Windows instead${RESET}"
         sudo mkfs.ntfs ${NTFSOPTIONS} /dev/$partition > /dev/null 2>&1
     fi
 }    
