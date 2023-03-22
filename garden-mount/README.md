@@ -1,4 +1,4 @@
-# Chia Mount/Unmount Script
+# chiamount - Chiadisks Mass (un)mounter
 
 This script helps you mount or unmount Chia-labelled drives based on a specified label prefix. Additionally, this repository provides two systemd service files for managing the mounting and unmounting process.
 
