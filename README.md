@@ -4,21 +4,15 @@ Chiagarden is a collection of tools designed to help you build, manage, and main
 
 ## chiainit
 
-chiainit is a bash script that helps you prepare and manage hard drives for PoST (Proof of Space and Time) farming. It automates the process of wiping, formatting, and labeling multiple drives at once, making it easy to set up and maintain your Chia farming storage.
-
-Visit the [chiainit](https://github.com/efnats/chiagarden/tree/main/chiainit) directory for detailed instructions and usage.
+[chiainit](https://github.com/efnats/chiagarden/tree/main/chiainit) is a bash script that helps you prepare and manage hard drives for PoST (Proof of Space and Time) farming. It automates the process of wiping, formatting, and labeling multiple drives at once, making it easy to set up and maintain your Chia farming storage.
 
 ## garden-mount
 
-garden-mount helps you mount or unmount Chia-labelled drives based on a specified label prefix. Additionally, this repository provides two systemd service files for managing the mounting and unmounting process.
-
-Visit the [garden-mount](https://github.com/efnats/chiagarden/tree/main/garden-mount) directory for detailed instructions and usage.
+[garden-mount](https://github.com/efnats/chiagarden/tree/main/ helps you mount or unmount Chia-labelled drives based on a specified label prefix. Additionally, this repository provides two systemd service files for managing the mounting and unmounting process.
 
 ## plotting
 
-In the plotting directory, you will find scripts for managing and automating the plotting process. These tools make it easier to count, move and replot your PoST plots
-
-Visit the [plotting](https://github.com/efnats/chiagarden/tree/main/plotting) directory for detailed instructions and usage.
+In [plotting](https://github.com/efnats/chiagarden/tree/main/plotting), you will find scripts for managing and automating the plotting process. These tools make it easier to count, move and replot your PoST plots
 
 ## Getting Started
 
