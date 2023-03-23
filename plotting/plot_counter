@@ -73,7 +73,7 @@ find_chia_disks() {
         echo "$mount_dir*"
     elif [ -n "$label" ]; then
         # List all mounted disks with their labels, filter those with labels starting with the given pattern
-        lsblk -o NAME,LABEL,MOUNTPOINT | awk -v label="$label" '$2 ~ "^"label {print $3"/*"}'
+        lsblk -o NAME,LABEL,MOUNTPOINT | awk -v label="$label" '$2 ~ "^"label && $3 != "" {print $3"/*"}'
     fi
 }
 
