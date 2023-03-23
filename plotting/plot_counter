@@ -73,9 +73,10 @@ find_chia_disks() {
         echo "$mount_dir*"
     elif [ -n "$label" ]; then
         # List all mounted disks with their labels, filter those with labels starting with the given pattern
-        lsblk -o NAME,LABEL,MOUNTPOINT | awk -v label="$label" '$2 ~ "^"label && $3 != "" {print $3"/*"}'
+        lsblk -o NAME,LABEL,MOUNTPOINT | awk -v label="$label" '$2 ~ "^"label {print $3}'
     fi
 }
+
 
 # Spinner code
 spinner=( '⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏' )
@@ -106,6 +107,7 @@ do
     # Get the list of chia disks
     chia_disks=$(find_chia_disks)
     chia_disks_count=$(echo "$chia_disks" | wc -l)
+    echo $find_chia_disks
 
     if [ -n "$mount_dir" ]; then
         echo -e "Counting plots in ${CYAN}$mount_dir*${RESET}"
@@ -136,6 +138,13 @@ do
     counts=()
     sizes=()
 
+# Debugging: Print the folders that are going to be processed
+echo -e "${YELLOW}Debugging:${RESET} Folders to be processed:"
+for disk in $(find_chia_disks)
+do
+    echo "$disk"
+done
+echo
 
 # Loop through all directories found by find_chia_disks
 for disk in $(find_chia_disks)
