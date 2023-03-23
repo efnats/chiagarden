@@ -1,8 +1,5 @@
 #!/bin/bash
 
-logfile="/var/log/plotmove.log" # Set to a valid file path to enable logging
-
-
 # ANSI escape sequences for colored output
 RED="\033[31m"
 GREEN="\033[32m"
@@ -12,7 +9,8 @@ MAGENTA="\033[35m"
 CYAN="\033[36m"
 RESET="\033[0m"
 
-
+logfile="/var/log/plot_move.log" # Set to a valid file path to enable logging
+rsync_options="--preallocate --remove-source-files --skip-compress plot --progress"
 
 timestamp() {
     echo -n "$(date '+%Y-%m-%d %H:%M:%S') "
@@ -33,14 +31,16 @@ echo -e "$(timestamp)${CYAN}Files will be transferred to: ${YELLOW}$dest_dir${RE
 _move_plot(){
     local plot
     plot="$1"
-    echo -e "$(timestamp)${GREEN}Plot: ${MAGENTA}$plot${RESET}"
+    echo -e "$(timestamp)${GREEN}New plot detected: ${MAGENTA}$plot${RESET}"
     echo -e "$(timestamp)${GREEN}Initiating transfer to: ${YELLOW}$dest_dir${RESET}"
-    rsync --preallocate --remove-source-files --skip-compress plot --whole-file --progress "$plot" "$dest_dir"/
-    echo -e "$(timestamp)${GREEN}Transfer completed.${RESET}"
 
-    if [ -n "$logfile" ] && [ -e "$logfile" ]; then
-        echo -e "$(timestamp)Transferred: $plot" >> "$logfile"
+    if [ -n "$logfile" ]; then
+        rsync $rsync_options --log-file="$logfile" "$plot" "$dest_dir"/
+    else
+        rsync $rsync_options "$plot" "$dest_dir"/
     fi
+
+    echo -e "$(timestamp)${GREEN}Transfer completed.${RESET}"
 }
 
 cleanup() {
