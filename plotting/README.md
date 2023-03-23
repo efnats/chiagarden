@@ -1,30 +1,37 @@
-# plot_counter - Displays amount of plots for each C-level
+# plot_counter - Display amount of plots for each C-level
 
 `plot_counter`: A script that counts Chia plots on multiple disks and calculates their total size in TiB (tebibytes). The script will scan mounted disks at a specified interval and display the count and size of plots found for each compression level. The results are displayed in a table format in the terminal.
 
 ## Usage
 
 ```bash
-./chia_plot_counter <mountpoint_of_chia_disks> [--interval interval_seconds]
+./chia_plot_counter.sh (--mount-dir </path/to/dir> | --label <disklabel>) [--interval interval_seconds]
 ```
 
 ## Options
-
-   - `--interval`(optional): rescan interval in seconds (Default: 120 seconds)
+   - `--mount-dir` </path/to/dir>: Count Chia plots in the specified directory
+   - `--label` <disklabel>: Count Chia plots in the disks starting with the specified label pattern
+   - `--interval` <interval_seconds>: Set the rescan interval in seconds (default: 120 seconds)
 
 ## Examples
 
-1. count all plots in /mnt/plots/*
+count all plots in /media/root/* Rescan after 100 seconds.
 
 ```bash
-./chia_plot_counter /mnt/plots/
+./chia_plot_counter --mount-dir /media/root --interval 100
 ```
 
 
-2. count all plots from all disks in /media/root/ beginning with the pattern CHIA* (/media/root/CHIA-001 /media/root/CHIA-002 ...)
+count all plots from all disks in /media/root/ beginning with the pattern CHIA* (/media/root/CHIA-001 /media/root/CHIA-002 ...)
 
 ```bash
 ./chia_plot_counter /media/root/CHIA
+```   
+
+count all plots from all disks labelled beginning with the pattern CHIA (no matter where they are mounted at in the system).
+
+```bash
+./chia_plot_counter --label CHIA
 ```   
 
 
