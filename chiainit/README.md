@@ -42,7 +42,7 @@ This command will wipe, format (ext4) and label the given drives.
 ## Warning
 
 While NTFS is generally supported via ntfs-3g it is highly discouraged to use any NTFS filesystem created on Linux for Windows.
-Read [here](https://unix.stackexchange.com/questions/617400/can-linux-corrupt-the-data-on-an-ntfs-partition)for more info.
+Read [here](https://unix.stackexchange.com/questions/617400/can-linux-corrupt-the-data-on-an-ntfs-partition) for more info.
 Thanks to @scrutinus and @limsandy for pointing me to this.
 
 ## Contributing
