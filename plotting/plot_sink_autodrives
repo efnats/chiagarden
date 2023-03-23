@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Default label
+label="CHIA-"
+
+# Parse command line arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --label) label="$2"; shift ;;
+        *) echo "Unknown parameter: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+# Define variables
+dest_disks=$(df -h | grep "^/dev/.*$label" | awk '{print $6"/gigahorse/"}' ORS=' ')
+
+# Run the chia_plot_sink command in the background with the destination directory
+/usr/local/bin/chia_plot_sink -- $dest_disks
+echo $dest_disks

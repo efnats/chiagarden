@@ -2,43 +2,30 @@
 
 `plot_counter`: A script that counts Chia plots on multiple disks and calculates their total size in TiB (tebibytes). The script will scan mounted disks at a specified interval and display the count and size of plots found for each compression level. The results are displayed in a table format in the terminal.
 
-## Requirements
-
-- The script assumes that your Chia plots are stored on mounted disks with a specific label format (e.g., CHIA-).
-- Use `Chiainit` from this repository for easy labelling or your CHIA drives
-
 ## Usage
 
 ```bash
-./chia_plot_counter <mountpoint_of_chia_disks> [--interval interval_seconds] [--label chia_disks_label]
+./chia_plot_counter <mountpoint_of_chia_disks> [--interval interval_seconds]
 ```
 
 ## Options
 
    - `--interval`(optional): rescan interval in seconds (Default: 120 seconds)
-   - `--label`: The label for Chia disks to include in the search. Default is "CHIA"
 
 ## Examples
 
-1. count all plots in /mnt/plots/CHIA*
+1. count all plots in /mnt/plots/*
 
 ```bash
-./chia_plot_counter /mnt/plots
+./chia_plot_counter /mnt/plots/
 ```
 
 
-2. count all plots in /media/root/GIGA*
+2. count all plots from all disks in /media/root/ beginning with the pattern CHIA* (/media/root/CHIA-001 /media/root/CHIA-002 ...)
 
 ```bash
-./chia_plot_counter /media/root --label GIGA
-```
-
-3. count all plots in /mnt/plots/* - no specific label given
-
-```bash
-./chia_plot_counter /mnt/plots --label ""
-```
-   
+./chia_plot_counter /media/root/CHIA
+```   
 
 
 # plot_mover - A simple and user-friendly plot moving script

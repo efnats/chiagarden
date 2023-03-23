@@ -6,7 +6,6 @@
 
 interval=120 # Default rescan interval (in seconds)
 chiadisks_mount=""
-chiadisks_label="CHIA"
 
 ##################################
 ### DO NOT CHANGE AFTER THIS LINE
@@ -17,10 +16,6 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         --interval)
             interval="$2"
-            shift 2
-            ;;
-        --label)
-            chiadisks_label="$2"
             shift 2
             ;;
         *)
@@ -37,7 +32,7 @@ done
 
 # Check if the user has provided the required arguments
 if [ -z "$chiadisks_mount" ]; then
-    echo "Usage: $0 <mountpoint_of_chia_disks> [--interval interval_seconds] [--label chia_disks_label]"
+    echo "Usage: $0 <mountpoint_of_chia_disks> [--interval interval_seconds]"
     exit 1
 fi
 
@@ -46,7 +41,7 @@ while true
 do
     # Clear the terminal screen
     clear
-    echo "Counting plots in $chiadisks_mount/$chiadisks_label*"
+    echo "Counting plots in $chiadisks_mount*"
     echo "every $interval seconds"
     echo
 
@@ -68,8 +63,8 @@ do
     counts=()
     sizes=()
 
-    # Loop through all disks that begin with the specified label mounted in the specified mount point
-    for disk in $chiadisks_mount/$chiadisks_label*
+    # Loop through all disks mounted in the specified mount point
+    for disk in $chiadisks_mount*
     do
         # Check if the disk is mounted and accessible
         if [ -d "$disk" ]
