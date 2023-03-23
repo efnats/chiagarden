@@ -138,13 +138,13 @@ do
     counts=()
     sizes=()
 
-# Debugging: Print the folders that are going to be processed
-echo -e "${YELLOW}Debugging:${RESET} Folders to be processed:"
-for disk in $(find_chia_disks)
-do
-    echo "$disk"
-done
-echo
+## Debugging: Print the folders that are going to be processed
+#echo -e "${YELLOW}Debugging:${RESET} Folders to be processed:"
+#for disk in $(find_chia_disks)
+#do
+#    echo "$disk"
+#done
+#echo
 
 # Loop through all directories found by find_chia_disks
 for disk in $(find_chia_disks)
