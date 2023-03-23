@@ -5,11 +5,32 @@
 ##################################
 
 interval=120 # Default rescan interval (in seconds)
-chiadisks_mount=""
+mount_dir=""
+label=""
+maxdepth=20
 
 ##################################
 ### DO NOT CHANGE AFTER THIS LINE
 ##################################
+
+# Add color variables and bold
+GREEN="\033[32m"
+YELLOW="\033[33m"
+CYAN="\033[36m"
+RED="\033[31m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+
+# Function to print usage text
+print_usage() {
+    echo "Usage: $0 (--mount-dir <mountpoint_of_chia_disks> | --label <label_of_chia_disks>) [--interval interval_seconds]"
+    echo
+    echo "Options:"
+    echo "  --mount-dir <mountpoint_of_chia_disks>  Count Chia plots in the specified directory."
+    echo "  --label <label_of_chia_disks>           Count Chia plots in the disks starting with the specified label."
+    echo "  --interval <interval_seconds>           Set the rescan interval in seconds (default: 120 seconds)."
+}
 
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
@@ -18,32 +39,84 @@ while [[ "$#" -gt 0 ]]; do
             interval="$2"
             shift 2
             ;;
+        --mount-dir)
+            mount_dir="$2"
+            shift 2
+            ;;
+        --label)
+            label="$2"
+            shift 2
+            ;;
         *)
-            if [ -z "$chiadisks_mount" ]; then
-                chiadisks_mount="$1"
-            else
-                echo "Unknown argument: $1"
-                exit 1
-            fi
-            shift
+            echo "Unknown argument: $1"
+            print_usage
+            exit 1
             ;;
     esac
 done
 
 # Check if the user has provided the required arguments
-if [ -z "$chiadisks_mount" ]; then
-    echo "Usage: $0 <mountpoint_of_chia_disks> [--interval interval_seconds]"
+if [ -z "$mount_dir" ] && [ -z "$label" ]; then
+    print_usage
     exit 1
 fi
+
+# Check if both --mount-dir and --label are provided
+if [ -n "$mount_dir" ] && [ -n "$label" ]; then
+    echo "Error: Both --mount-dir and --label cannot be used at the same time."
+    print_usage
+    exit 1
+fi
+
+find_chia_disks() {
+    if [ -n "$mount_dir" ]; then
+        echo "$mount_dir*"
+    elif [ -n "$label" ]; then
+        # List all mounted disks with their labels, filter those with labels starting with the given pattern
+        lsblk -o NAME,LABEL,MOUNTPOINT | awk -v label="$label" '$2 ~ "^"label {print $3"/*"}'
+    fi
+}
+
+# Spinner code
+spinner=( '⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏' )
+
+start_spinner() {
+    while true; do
+        for i in "${spinner[@]}"; do
+            echo -ne "\r$i"
+            sleep 0.1
+        done
+    done &
+    spinner_pid=$!
+}
+
+stop_spinner() {
+    kill "$spinner_pid" > /dev/null 2>&1
+    wait "$spinner_pid" > /dev/null 2>&1
+    echo -ne "\r"
+}
+
 
 # Loop indefinitely
 while true
 do
     # Clear the terminal screen
     clear
-    echo "Counting plots in $chiadisks_mount*"
-    echo "every $interval seconds"
-    echo
+
+    # Get the list of chia disks
+    chia_disks=$(find_chia_disks)
+    chia_disks_count=$(echo "$chia_disks" | wc -l)
+
+    if [ -n "$mount_dir" ]; then
+        echo -e "Counting plots in ${CYAN}$mount_dir*${RESET}"
+        echo
+    elif [ -n "$label" ]; then
+        echo -e "Counting plots in $chia_disks_count disks found with label pattern ${CYAN}$label${RESET}"
+        echo
+    fi
+
+    # Start the spinner
+    start_spinner
 
     # Initialize an array with the patterns to search for
     patterns=(
@@ -59,58 +132,64 @@ do
         'plot-k32-c9*.plot'
     )
 
-    # Initialize an array to store the total counts and sizes
+    # Initializea n array to store the total counts and sizes
     counts=()
     sizes=()
 
-    # Loop through all disks mounted in the specified mount point
-    for disk in $chiadisks_mount*
-    do
-        # Check if the disk is mounted and accessible
-        if [ -d "$disk" ]
-        then
-            # Loop through all patterns and count the number of files matching each pattern
-            for i in "${!patterns[@]}"
-            do
-                count=$(find "$disk" -maxdepth 10 -name "${patterns[$i]}" | wc -l)
 
-                # Add the count to the corresponding element in the counts array
-                counts[$i]=$((counts[$i] + count))
+# Loop through all directories found by find_chia_disks
+for disk in $(find_chia_disks)
+do
+    # Check if the disk is accessible
+    if [ -d "$disk" ]
+    then
+        # Loop through all patterns and count the number of files matching each pattern
+        for i in "${!patterns[@]}"
+        do
+            count=$(find "$disk" -maxdepth "$maxdepth" -name "${patterns[$i]}" | wc -l)
 
-                # Calculate the size of the files matching the pattern in TiB
-                size=$(find "$disk" -maxdepth 10 -name "${patterns[$i]}" -printf '%s\n' | awk '{s+=$1} END {print s/1024/1024/1024/1024}')
-                
-                # Add the size to the corresponding element in the sizes array
-                sizes[$i]=$(awk -v size="${sizes[$i]:-0}" -v new_size="$size" 'BEGIN {print size+new_size}')
-            done
-        fi
-    done
+            # Add the count to the corresponding element in the counts array
+            counts[$i]=$((counts[$i] + count))
 
-    # Print the table header
-    printf "%-5s %12s %12s\n" "Plot" "Count" "TiB"
-    printf "===================================\n"
+            # Calculate the size of the files matching the pattern in TiB
+            size=$(find "$disk" -maxdepth "$maxdepth" -name "${patterns[$i]}" -printf '%s\n' | awk '{s+=$1} END {print s/1024/1024/1024/1024}')
+            
+            # Add the size to the corresponding element in the sizes array
+            sizes[$i]=$(awk -v size="${sizes[$i]:-0}" -v new_size="$size" 'BEGIN {print size+new_size}')
+        done
+    fi
+done
 
-    # Print the total counts and sizes for each C-part pattern
-    total_plots=0
-    total_size=0
-    for i in {0..9}
-    do
-        count="${counts[$i]}"
-        plot="C$i"
-        if [ $i -eq 0 ]
-        then
-            plot="C0"
-        fi
-        size="${sizes[$i]:-0}"
-        printf "%-5s %12s %12s\n" "$plot:" "$count" "$(printf '%.2f' "$size")"
-        total_plots=$((total_plots + count))
-        total_size=$(awk -v total_size="$total_size" -v new_size="$size" 'BEGIN {print total_size+new_size}')
-    done
+# Stop the spinner
+stop_spinner
 
-    # Print the total number of plots and size in TiB
-    printf "===================================\n"
-    printf "%-5s %12s %12s\n" "Total" "$total_plots" "$(printf '%.2f' "$total_size")"
+# Print the table header
+printf "%-5s %12s %12s\n" "Plot" "Count" "TiB"
+printf "==================================\n"
 
-    # Sleep for the specified interval before repeating the loop
+# Print the total counts and sizes for each C-part pattern
+total_plots=0
+total_size=0
+for i in {0..9}
+do
+    count="${counts[$i]}"
+    plot="C$i"
+    if [ $i -eq 0 ]
+    then
+        plot="C0"
+    fi
+    size="${sizes[$i]:-0}"
+    printf "%-5s %12s %12s\n" "$plot:" "$count" "$(printf '%.2f' "$size")"
+    total_plots=$((total_plots + count))
+    total_size=$(awk -v total_size="$total_size" -v new_size="$size" 'BEGIN {print total_size+new_size}')
+done
+
+# Print the total number of plots and size in TiB
+printf "=================================\n"
+printf "%-5s %12s %12s\n" "Total" "$total_plots" "$(printf '%.2f' "$total_size")"
+
+# Sleep for the specified interval before repeating the loop
+    echo
+    echo -e "every ${CYAN}$interval${RESET} seconds"
     sleep "$interval"
 done
