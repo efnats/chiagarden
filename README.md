@@ -1,10 +1,14 @@
 # Chiagarden
 
-Chiagarden is a collection of tools designed to help you build, manage, and maintain a Chia PoST farm on a linux based system. These tools make it easier to prepare and mount your hard disks, and manage your plots for your PoST farm.
+Chiagarden is a collection of tools designed to help you build, manage, and maintain a Chia PoST (Proof of Space and Time) farm on a linux based system. These tools make it easy to prepare and mount your hard disks, and manage your plots for your farm.
+
+Have you typed your individual disk paths one too many times? Plots missing? Are you just done with searching the one typo you made in fstab? If yes, then this is for you. The general concept is to uniquely label drives with a certain pattern (for example CHIA-[SERIALNR]) which then makes it very easy for later processing.
+
+With that said, you can still use most of these tools without (re)labelling your drives. 
 
 ## chiainit
 
-[chiainit](https://github.com/efnats/chiagarden/tree/main/chiainit) is a bash script that helps you prepare and manage hard drives for PoST (Proof of Space and Time) farming. It automates the process of wiping, formatting, and labeling multiple drives at once, making it easy to set up and maintain your Chia farming storage.
+[chiainit](https://github.com/efnats/chiagarden/tree/main/chiainit) is a bash script that helps you prepare and manage hard drives for PoST farming. It automates the process of wiping, formatting, and labeling multiple drives at once, making it easy to set up and maintain your Chia farming storage.
 
 ## garden-mount
 
