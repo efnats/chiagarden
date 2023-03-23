@@ -1,32 +1,59 @@
 #!/bin/bash
 
+logfile="/var/log/plotmove.log" # Set to a valid file path to enable logging
+
+
+# ANSI escape sequences for colored output
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+BLUE="\033[34m"
+MAGENTA="\033[35m"
+CYAN="\033[36m"
+RESET="\033[0m"
+
+
+
+timestamp() {
+    echo -n "$(date '+%Y-%m-%d %H:%M:%S') "
+}
+
 if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <watch_dir> <dest_dir>"
+    echo -e "$(timestamp)${RED}Error: Invalid number of arguments.${RESET}"
+    echo -e "$(timestamp)${RED}Usage: $0 <watch_dir> <dest_dir>${RESET}"
     exit 1
 fi
 
 watch_dir="$1" # source directory
 dest_dir="$2"  # destination directory
-#dest_dir='rsync://destination_host:12000/garden' # for use with rsyncd
 
-echo "watching $watch_dir and moving consecutively to $dest_dir"
+echo -e "$(timestamp)${CYAN}Monitoring directory: ${YELLOW}$watch_dir${RESET}"
+echo -e "$(timestamp)${CYAN}Files will be transferred to: ${YELLOW}$dest_dir${RESET}"
 
 _move_plot(){
     local plot
     plot="$1"
-    echo "---- Detected new plot: $plot"
-    echo moving to "$dest_dir"
+    echo -e "$(timestamp)${GREEN}Plot: ${MAGENTA}$plot${RESET}"
+    echo -e "$(timestamp)${GREEN}Initiating transfer to: ${YELLOW}$dest_dir${RESET}"
     rsync --preallocate --remove-source-files --skip-compress plot --whole-file --progress "$plot" "$dest_dir"/
-    #	echo -n "Changing attribute to immutable.."
-    #	chattr +i "$dest_dir"/$Filename
-    echo "---- done"
+    echo -e "$(timestamp)${GREEN}Transfer completed.${RESET}"
+
+    if [ -n "$logfile" ] && [ -e "$logfile" ]; then
+        echo -e "$(timestamp)Transferred: $plot" >> "$logfile"
+    fi
 }
+
+cleanup() {
+    echo -e "$(timestamp)${RED}Terminating script due to SIGINT...${RESET}"
+    kill -- -$$
+}
+
+trap cleanup SIGINT
 
 loop(){
     local filename
     while true; do
         filename=$(ls -tr $watch_dir/*.plot 2> /dev/null | head -1)
-        #filename=$(basename -a $watch_dir/plot-k32-*.plot 2> /dev/null | head -1)
         if [[ $filename != *.plot ]]; then
             sleep 5
             continue
@@ -35,9 +62,3 @@ loop(){
     done
 }
 loop
-
-# inotifywait -m -e move --format "%f" "$WATCH_DIR" \
-#     | while read Filename
-#        do
-#          _move_plot
-#        done

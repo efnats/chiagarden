@@ -5,7 +5,7 @@
 ## Usage
 
 ```bash
-./chia_plot_counter.sh (--mount-dir </path/to/dir> | --label <disklabel>) [--interval interval_seconds]
+./chia_plot_counter (--mount-dir </path/to/dir> | --label <disklabel>) [--interval interval_seconds]
 ```
 
 ## Options
