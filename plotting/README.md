@@ -94,3 +94,8 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
 ## Example
    
    -`./plot_over --dry-run`
+
+
+## todo
+
+   Add option `--subdir`to enable parsing DISK1/subdir/* DISK2/subdir/* etc..
