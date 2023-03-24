@@ -94,14 +94,19 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
 ## Example
    
    Delete enough Plots to make sure that x amount of disks mounted in /media/root/ each have xx G free space (set values in the variables)
-   -`./plot_over --mount-dir /media/root`
+   ```bash
+   ./plot_over --mount-dir /media/root
+   ```
 
    Delete enough Plots to make sure that x amount of disks labelled begining with the pattern CHIA each have xx G free space (set values in the variables)
-   -`./plot_over --label CHIA`
+   ```bash
+   ./plot_over --label CHIA
+   ```
 
    Same as above, but do not actually delete anything. Just show what would happen.
-   -`./plot_over --dry-run --label CHIA` 
-
+   ```bash
+   ./plot_over --dry-run --label CHIA
+   ```
 
 ## Todo
 
