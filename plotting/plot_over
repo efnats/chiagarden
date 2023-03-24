@@ -4,13 +4,12 @@
 #   VARIABLES - adjust these     #
 ##################################
 
-chiadisks_mountpoint="/media/root"
 min_free_space=100 # minimum free space in GB
 plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1*.plot' 'plot-k32-c2*.plot' 'plot-k32-c3*..plot' 'plot-k32-c4*.plot' 'plot-k32-c5*.plot' 'plot-k32-c6*.plot' 'plot-k32-c7*.plot' 'plot-k32-c8*.plot')
 replot_levels="0,1,2,3,4,5,6" # comma-separated list of plot_pattern indices to be removed
 amount_free_disks=5 # desired amount of disks with min_free_space
 interval=30
-
+search_depth=20 # maximum search depth for plot files
 
 ###### nothing to see after this line ###############
 
@@ -22,38 +21,76 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
+min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
+IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
+
+function print_usage() {
+    echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label]"
+    echo "Note: --mount-dir and --label cannot be used at the same time."
+}
+
 # Parse command-line arguments
 dry_run=false
 
-for arg in "$@"
-do
-  case $arg in
-    --dry-run) dry_run=true; shift ;;
-    *) echo "Usage: $0 [--dry-run] for dry-run mode."; exit 1 ;;
-  esac
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --dry-run) dry_run=true; shift ;;
+        --interval)
+            interval="$2"
+            shift 2
+            ;;
+        --mount-dir)
+            mount_dir="$2"
+            shift 2
+            ;;
+        --label)
+            label="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            print_usage
+            exit 1
+            ;;
+    esac
 done
 
+## Check if the user has provided the required arguments
+if [ -z "$mount_dir" ] && [ -z "$label" ]; then
+    print_usage
+    exit 1
+fi
 
-min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
-IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
+# Check if both --mount-dir and --label are provided
+if [ -n "$mount_dir" ] && [ -n "$label" ]; then
+    echo "Error: Both --mount-dir and --label cannot be used at the same time."
+    print_usage
+    exit 1
+fi
+
+# If --label is provided, find the mount points matching the label
+if [ -n "$label" ]; then
+  IFS=$'\n' read -rd '' -a disks < <(lsblk -o NAME,LABEL,MOUNTPOINT | awk -v label="$label" '$2 ~ "^"label {print $3}')
+else
+  # If --mount-dir is provided, use it as the base directory for directories with the pattern "CHIA-*"
+  disks=("$mount_dir"*)
+fi
 
 while true; do
   clear
 
-# Count the number of disks in /media/root/CHIA-*
- disk_count=$(find /media/root -maxdepth 1 -type d -name "CHIA-*" | wc -l)
+  # Count the number of disks
+  disk_count="${#disks[@]}"
 
-
-echo "Watching a total of $disk_count disks" 
-echo "$amount_free_disks disks each required to have $min_free_space GB free space"
+  echo "Watching a total of $disk_count disks"
+  echo "$amount_free_disks disks each required to have $min_free_space GB free space"
   if [ "$dry_run" = true ]; then
     echo -e "${CYAN}DRY-RUN MODE - NOTHING WILL BE DELETED${RESET}"
   fi
- 
-  free_disks=()
 
+   free_disks=()
 
-  for disk in "$chiadisks_mountpoint"/CHIA-*; do
+  for disk in "${disks[@]}"; do
     free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
     if [ "$free_space" -ge "$min_free_space_bytes" ]; then
       free_disks+=("$disk")
@@ -61,9 +98,19 @@ echo "$amount_free_disks disks each required to have $min_free_space GB free spa
   done
 
   echo
-    echo "Disks that meet the requirements:"
+  echo "Disks that meet the requirements:"
   duf ${free_disks[@]}
   echo
+
+  ## Debugging output - List of directories being processed
+  ## Uncomment the following lines to display the directories being processed
+  #echo -e "${YELLOW}Debugging output:${RESET}"
+  #echo "Processing the following directories:"
+  #for disk in "${disks[@]}"; do
+  #  echo "  - $disk"
+  #done
+  #echo -e "${YELLOW}End of debugging output${RESET}"
+  ## End of debugging output
 
   while [ "${#free_disks[@]}" -lt "$amount_free_disks" ]; do
     plot_found=false
@@ -73,8 +120,8 @@ echo "$amount_free_disks disks each required to have $min_free_space GB free spa
       least_free_space_disk=""
       oldest_file=""
 
-      for disk in "$chiadisks_mountpoint"/CHIA-*; do
-        matching_files=$(find "$disk" -maxdepth 2 -name "$plot_pattern")
+      for disk in "${disks[@]}"; do
+        matching_files=$(find "$disk" -maxdepth "$search_depth" -name "$plot_pattern")
 
         if [ -n "$matching_files" ]; then
           free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
@@ -106,7 +153,7 @@ echo "$amount_free_disks disks each required to have $min_free_space GB free spa
 
     free_disks=()
 
-    for disk in "$chiadisks_mountpoint"/CHIA-*; do
+    for disk in "${disks[@]}"; do
       free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
       if [ "$free_space" -ge "$min_free_space_bytes" ]; then
         free_disks+=("$disk")
