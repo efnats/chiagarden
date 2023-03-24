@@ -5,8 +5,8 @@ ChiaGarden is a collection of tools designed to help you build, manage, and main
 If you agree that typing disk paths is a job you shouldn't be doing, then this is for you. chiagarden lets you uniquely label drives with a certain pattern (for example CHIA-[SERIALNR]) which then makes it very easy for later processing.
 
 With that said, you don't have to (re)label your drives in order for these tools to function. Most of the tools in the repo let you chose between two operatin modes:
-`--label` lets you search and process plots based on disks labelled
-`--mount-dir` lets you search and process plots based on mountpoints
+`--label` lets you search and process plots based on disks labelled.
+`--mount-dir` lets you search and process plots based on mountpoints.
 As long as your disks are mounted to the same mountpoint exclusively, there is absolutely no difference.
 
 ## chiainit

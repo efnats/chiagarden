@@ -1,0 +1,85 @@
+#!/bin/bash
+
+subdir=""
+default_command=echo
+#default_command=usr/local/bin/chia_plot_sink --
+
+# Add color variables and bold
+GREEN="\033[32m"
+YELLOW="\033[33m"
+CYAN="\033[36m"
+RED="\033[31m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+# Function to print usage text
+print_usage() {
+    echo  "Usage:"
+    echo "./taco_plot --mount-dir /path/to/dir [--subdir subdir_name] [--format oneline|newline]"
+    echo "or"
+    echo "./taco_plot --label CHIA [--subdir subdir_name] [--format oneline|newline]"
+}
+
+# Parse command-line arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --mount-dir)
+            mount_dir="$2"
+            shift 2
+            ;;
+        --label)
+            label="$2"
+            shift 2
+            ;;
+        --subdir)
+            subdir="$2"
+            shift 2
+            ;;
+        --format)
+            format="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            print_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Check if the user has provided the required arguments
+if [ -z "$mount_dir" ] && [ -z "$label" ]; then
+    print_usage
+    exit 1
+fi
+
+# Check if both --mount-dir and --label are provided
+if [ -n "$mount_dir" ] && [ -n "$label" ]; then
+    echo "Error: Both --mount-dir and --label cannot be used at the same time."
+    print_usage
+    exit 1
+fi
+
+# Define variables
+if [ -n "$mount_dir" ]; then
+    dest_disks=$(find "$mount_dir" -mindepth 1 -maxdepth 1 -type d | sed "s|$|/$subdir|" | tr '\n' ' ')
+elif [ -n "$label" ]; then
+    dest_disks=$(df -h | grep -E "^/dev/.*$label" | awk -v s="$subdir" '{print $6"/"s}' ORS=' ')
+fi
+
+# Set the default format to 'oneline' if --format is omitted
+if [ -z "$format" ]; then
+    format="oneline"
+fi
+
+# Adjust output format based on --format argument
+if [ "$format" == "newline" ]; then
+    IFS=' ' read -ra ADDR <<< "$dest_disks"
+    dest_disks=""
+    for i in "${ADDR[@]}"; do
+        dest_disks+="$i"$'\n'
+    done
+fi
+
+# Run the default command in the background with the destination directory $dest_disks
+$default_command -e "$dest_disks"

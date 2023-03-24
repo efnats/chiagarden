@@ -99,7 +99,7 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
    ./plot_over --mount-dir /media/root
    ```
 
-   Delete enough Plots in disks labelled with the pattern CHIA to make sure that x amount of disks each have y G free space. Process only Plots in (/path/to/DISK/gigahorse. (set x/y values in the variables section in the script)
+   Delete enough Plots in disks labelled with the pattern CHIA to make sure that x amount of disks each have y G free space. Process only Plots in /path/to/DISK/gigahorse. (set x/y values in the variables section in the script)
    ```bash
    ./plot_over --label CHIA --subdir gigahorse
    ```
