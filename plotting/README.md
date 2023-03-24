@@ -69,14 +69,13 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
 ## Requirements
 
 - duf-utility https://github.com/muesli/duf
-- The script assumes that your Chia plots are stored on mounted disks with a specific label format (e.g., CHIA-).
+- your plot files are either distributed on disks labelled with the same prefix for all of them, or they are all mounted in one mountoint (exclusively)
 
 ## Usage
 
 1. Open the script in a text editor and set the following variables according to your setup:
 
-   - `chiadisks_mountpoint`: mount point of Chia disks (e.g., /media/root)
-   - `min_free_space`: minimum free space in GB (e.g., 100)
+   - `min_free_space`: minimum free space in GB per Disk(e.g., 100)
    - `replot_levels`: comma-separated list of plot compression levels that may be replotted
    - `amount_free_disks`: desired number of disks with minimum free space (e.g., 10)
    - `interval`: rescan interval in seconds (default is 30 seconds)
@@ -89,6 +88,8 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
 ## Options
 
    - `--dry-run`(optional): simulation mode. Will not delete anything
+   - `--mount-dir` </path/to/dir>: Process Plots under the specified directory
+   - `--label` <disklabel>: Process plots in the disks starting with the specified label pattern   
 
 ## Example
    
