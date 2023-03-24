@@ -1,6 +1,6 @@
 # ChiaGarden
 
-ChiaGarden is a collection of tools designed to help you build, manage, and maintain a Chia PoST (Proof of Space and Time) farm on a linux based system. These tools make it easy to prepare and mount your hard disks, and manage your plots for your farm.
+ChiaGarden is a collection of tools designed to help you build, manage, and maintain a PoST (Proof of Space and Time) farm on a linux based system. These tools make it easy to prepare and mount your hard disks, and manage your plots for your farm.
 
 If you agree that typing disk paths is a job you shouldn't be doing, then this is for you. chiagarden lets you uniquely label drives with a certain pattern (for example CHIA-[SERIALNR]) which then makes it very easy for later processing.
 

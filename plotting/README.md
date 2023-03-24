@@ -92,7 +92,7 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
    - `--label <disklabel>`: Process plots in the disks starting with the specified label pattern
    - `--subdir <subdir>`: Process Plots in `</path/to/disk>/<subdir>`
 
-## Example
+## Examples
    
    Delete enough Plots in disks mounted in /media/root/ to make sure that x amount of disks each have y G free space (set x/y values in the variables section in the script)
    ```bash
