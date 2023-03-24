@@ -21,7 +21,7 @@ As long as your disks are mounted to the same mountpoint exclusively, there is a
 
 [plotting](https://github.com/efnats/chiagarden/tree/main/plotting) contains various scripts for managing, monitoring and automating the (re)plotting process.
 
-# taco_list
+## taco_list
 
 [taco_list](https://github.com/efnats/chiagarden/tree/main/taco_list) is a simple wrapper script to list your destination disks and execute any command with the given parameters - for example chia_plot_sink
 
