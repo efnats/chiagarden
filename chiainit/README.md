@@ -37,7 +37,7 @@ Options
 ```bash
 ./chiainit --fstype ext4 --init sdx sdy sdz sdaa sdab
 ```
-This command will wipe, format (ext4) and label the given drives.
+This command will wipe, format (ext4) and label the given drives using the label Pattern CHIA-[SERIALNR]
 
 ## Warning
 

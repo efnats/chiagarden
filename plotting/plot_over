@@ -1,17 +1,17 @@
 #!/bin/bash
 
-##################################
-#   VARIABLES - adjust these     #
-##################################
+################################################
+#   VARIABLES - adjust these to your liking    #
+################################################
 
 min_free_space=100 # minimum free space in GB
-plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1*.plot' 'plot-k32-c2*.plot' 'plot-k32-c3*..plot' 'plot-k32-c4*.plot' 'plot-k32-c5*.plot' 'plot-k32-c6*.plot' 'plot-k32-c7*.plot' 'plot-k32-c8*.plot')
-replot_levels="0,1,2,3,4,5,6" # comma-separated list of plot_pattern indices to be removed
 amount_free_disks=5 # desired amount of disks with min_free_space
-interval=30
-search_depth=20 # maximum search depth for plot files
+replot_levels="0,1,2,3,4,5,6" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
+search_depth=10 # maximum search depth for plot files - how many subdir levels should we iterate?
+subdir=""
+interval=30 # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this realitely low (30s)
 
-###### nothing to see after this line ###############
+###### No variables to change below ###############
 
 # Add color variables and bold
 GREEN="\033[32m"
@@ -21,6 +21,7 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
+plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1*.plot' 'plot-k32-c2*.plot' 'plot-k32-c3*..plot' 'plot-k32-c4*.plot' 'plot-k32-c5*.plot' 'plot-k32-c6*.plot' 'plot-k32-c7*.plot' 'plot-k32-c8*.plot')
 min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
 IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
 
@@ -47,6 +48,10 @@ while [[ "$#" -gt 0 ]]; do
             label="$2"
             shift 2
             ;;
+        --subdir)
+            subdir="$2"
+            shift 2
+            ;;    
         *)
             echo "Unknown argument: $1"
             print_usage
@@ -76,14 +81,27 @@ else
   disks=("$mount_dir"*)
 fi
 
+# Append subdir to each disk if provided
+if [ -n "$subdir" ]; then
+  for i in "${!disks[@]}"; do
+    disks[i]="${disks[i]}/$subdir"
+  done
+fi
+
 while true; do
   clear
 
   # Count the number of disks
   disk_count="${#disks[@]}"
 
-  echo "Watching a total of $disk_count disks"
+  if [ -n "$mount_dir" ]; then
+  echo -e "Watching a total of $disk_count disks in ${CYAN}$mount_dir*${RESET}"
+    elif [ -n "$label" ]; then
+  echo -e "Watching a total of $disk_count disks labelled with the pattern ${CYAN}$label${RESET}"
+  fi
+
   echo "$amount_free_disks disks each required to have $min_free_space GB free space"
+  
   if [ "$dry_run" = true ]; then
     echo -e "${CYAN}DRY-RUN MODE - NOTHING WILL BE DELETED${RESET}"
   fi
@@ -102,15 +120,16 @@ while true; do
   duf ${free_disks[@]}
   echo
 
+
   ## Debugging output - List of directories being processed
-  ## Uncomment the following lines to display the directories being processed
-  #echo -e "${YELLOW}Debugging output:${RESET}"
-  #echo "Processing the following directories:"
-  #for disk in "${disks[@]}"; do
-  #  echo "  - $disk"
-  #done
-  #echo -e "${YELLOW}End of debugging output${RESET}"
-  ## End of debugging output
+  if [ "$dry_run" = true ]; then
+      echo -e "${YELLOW}Debugging output:${RESET}"
+      echo "Processing the following directories:"
+      for disk in "${disks[@]}"; do
+        echo "  - $disk"
+  done
+  echo -e "${YELLOW}End of debugging output${RESET}"
+  fi
 
   while [ "${#free_disks[@]}" -lt "$amount_free_disks" ]; do
     plot_found=false

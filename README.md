@@ -15,7 +15,7 @@ As long as your disks are mounted to the same mountpoint exclusively, there is a
 
 ## garden-mount
 
-[garden-mount](https://github.com/efnats/chiagarden/tree/main/) is a script for (un)mounting drives based on a specified label prefix. Additionally, this repository provides systemd service files for managing the mounting and unmounting process.
+[garden-mount](https://github.com/efnats/chiagarden/tree/main/garden-mount) is a script for (un)mounting drives based on a specified label prefix. Additionally, this repository provides systemd service files for managing the mounting and unmounting process.
 
 ## plotting
 

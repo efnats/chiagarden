@@ -10,7 +10,7 @@
 
 ## Options
    - `--mount-dir` </path/to/dir>: Count Chia plots in the specified directory
-   - `--label` <disklabel>: Count Chia plots in the disks starting with the specified label pattern
+   - `--label` <disklabel>: Count Chia plots in the disks starting with the specified label pattern (default: CHIA)
    - `--interval` <interval_seconds>: Set the rescan interval in seconds (default: 120 seconds)
 
 ## Examples
@@ -28,10 +28,10 @@ count all plots from all disks in /media/root/ beginning with the pattern CHIA* 
 ./chia_plot_counter /media/root/CHIA
 ```   
 
-count all plots from all disks labelled beginning with the pattern CHIA (no matter where they are mounted at in the system).
+count all plots from all disks labelled beginning with the pattern GIGA (no matter where they are mounted at in the system).
 
 ```bash
-./chia_plot_counter --label CHIA
+./chia_plot_counter --label GIGA
 ```   
 
 
@@ -64,12 +64,12 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
 
 # plot_over - A replot helper
 
-`plot_over`: This script monitors the free space of Chia plot disks and automatically removes older plots when the free space falls below a specified threshold. The script aims to maintain a desired number of disks with at least the specified minimum free space.
+`plot_over`: This script will assist your replotting process by gradually removing undesired plots with a given compression level. To achieve this it will monitor the free space of Chia plot disks and automatically remove older plots of one or multiple given C-levels when the free space of a disk falls below a specified threshold. The script aims to maintain a desired number of disks with at least the specified minimum free space. This way enough disks are continously offered to other tools like plot_sink or mergerfs to optimize bandwith.
 
 ## Requirements
 
 - duf-utility https://github.com/muesli/duf
-- your plot files are either distributed on disks labelled with the same prefix for all of them, or they are all mounted in one mountoint (exclusively)
+- your plot files are either distributed on disks labelled with the same prefix or they are all mounted in one mountpoint exclusively.
 
 ## Usage
 
@@ -89,25 +89,22 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
 
    - `--dry-run`(optional): simulation mode. Will not delete anything
    - `--mount-dir` </path/to/dir>: Process Plots under the specified directory
-   - `--label` <disklabel>: Process plots in the disks starting with the specified label pattern   
+   - `--label` <disklabel>: Process plots in the disks starting with the specified label pattern
+    - `--subdir` <subdir>: Process Plots in disk/<subdir>
 
 ## Example
    
-   Delete enough Plots to make sure that x amount of disks mounted in /media/root/ each have xx G free space (set values in the variables)
+   Delete enough Plots in disks mounted in /media/root/ to make sure that x amount of disks each have y G free space (set x/y values in the variables section in the script)
    ```bash
    ./plot_over --mount-dir /media/root
    ```
 
-   Delete enough Plots to make sure that x amount of disks labelled begining with the pattern CHIA each have xx G free space (set values in the variables)
+   Delete enough Plots in disks labelled with the pattern CHIA to make sure that x amount of disks each have y G free space. Process only Plots in (/path/to/DISK/gigahorse. (set x/y values in the variables section in the script)
    ```bash
-   ./plot_over --label CHIA
+   ./plot_over --label CHIA --subdir gigahorse
    ```
 
    Same as above, but do not actually delete anything. Just show what would happen.
    ```bash
-   ./plot_over --dry-run --label CHIA
+   ./plot_over --dry-run --label CHIA --subdir gigahorse
    ```
-
-## Todo
-
-   Add option `--subdir`to enable parsing DISK1/subdir/* DISK2/subdir/* etc..
