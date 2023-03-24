@@ -133,7 +133,8 @@ label() {
 # Function to wipe a drive
 wipe() {
     drive=$1
-    sudo wipefs -a /dev/$drive > /dev/null 2>&1
+    sudo wipefs -a /dev/$drive 2>&1
+    sudo dd if=/dev/zero of=/dev/$drive bs=1M count=100
 }    
 
 # Function to format a drive
@@ -143,15 +144,20 @@ format() {
         return
     fi
 
-    echo -e "g\nn\n1\n\n\nw" | sudo fdisk /dev/$drive > /dev/null 2>&1
+    #echo -e "g\nn\n1\n\n\nw" | sudo fdisk /dev/$drive 2>&1
     partition="${drive}1"
     if [ "$FSTYPE" == "xfs" ]; then
-        sudo mkfs.xfs ${XFSOPTIONS} /dev/$partition > /dev/null 2>&1
+        sudo parted /dev/$drive --script mklabel gpt mkpart primary xfs 0% 100%
+        sudo sync
+        sudo mkfs.xfs ${XFSOPTIONS} /dev/$partition 2>&1
     elif [ "$FSTYPE" == "ext4" ]; then
-        sudo mkfs.ext4 ${EXT4OPTIONS} /dev/$partition > /dev/null 2>&1
+        sudo parted /dev/$drive --script mklabel gpt mkpart primary ext4 0% 100%
+        sudo sync
+        sudo mkfs.ext4 ${EXT4OPTIONS} /dev/$partition 2>&1
     elif [ "$FSTYPE" == "ntfs" ]; then
-        echo -e "${YELLOW}Warning:${RESET} Formatting with NTFS using the ntfs-3g driver in Linux may endanger the integrity of your data. It is highly discouraged!! If you are a Windows user, consider using ext4 for Windows instead${RESET}"
-        sudo mkfs.ntfs ${NTFSOPTIONS} /dev/$partition > /dev/null 2>&1
+        sudo parted /dev/$drive --script mklabel gpt mkpart primary ntfs 0% 100%
+        sudo sync
+        sudo mkfs.ntfs ${NTFSOPTIONS} /dev/$partition 2>&1
     fi
 }    
 
@@ -238,6 +244,7 @@ execute_action() {
             ;;
         --wipe)
             echo -ne "  ${YELLOW}Wiping /dev/$drive...${RESET}"
+            echo -e ""
             wipe $drive &
             pid=$!
             spinner $pid
@@ -245,6 +252,7 @@ execute_action() {
             ;;
         --format)
             echo -ne "  ${YELLOW}Formatting /dev/$drive...${RESET}"
+            echo -e ""
             format $drive &
             pid=$!
             spinner $pid
@@ -252,12 +260,13 @@ execute_action() {
             ;;
         --label)
             echo -ne "  ${YELLOW}Labeling /dev/${drive}1...${RESET}"
-            label $drive "${drive}1" &
+            echo -e ""
+            label $drive "${drive}1"
+            drive_label=$(get_label "${drive}1")
+            echo -e "  ${CYAN}New label: ${RESET}${drive_label}"
             pid=$!
             spinner $pid
             wait $pid
-            drive_label=$(get_label "${drive}1")
-            echo -e "  ${CYAN}New label: ${RESET}${drive_label}"
             ;;
     esac
 }
