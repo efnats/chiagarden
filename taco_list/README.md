@@ -4,13 +4,13 @@ A simple wrapper script to list your destination disks and execute any command w
 
 ## Usage
 
-\\\```bash
+```bash
 ./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--format oneline|newline]
-\\\```
+```
 or
-\\\```bash
+```bash
 ./taco_list --label CHIA [--subdir subdir_name] [--format oneline|newline]
-\\\```
+```
 
 ## Arguments
 
@@ -23,6 +23,6 @@ or
 
 To find disks mounted under `/media/root/` with a subdirectory named `gigahorse` and display their paths in a newline-separated format, run:
 
-\\\```bash
+```bash
 ./taco_list --mount-dir /media/root --subdir gigahorse --format newline
-\\\```
+```
