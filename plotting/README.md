@@ -69,7 +69,7 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
 ## Requirements
 
 - duf-utility https://github.com/muesli/duf
-- your plot files are either distributed on disks labelled with the same prefix or they are all mounted in one mountpoint exclusively.
+- your plot files are either distributed on disks labelled with the same prefix or the plot disks are all mounted in one mountpoint exclusively.
 
 ## Usage
 
@@ -88,9 +88,9 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
 ## Options
 
    - `--dry-run`(optional): simulation mode. Will not delete anything
-   - `--mount-dir` </path/to/dir>: Process Plots under the specified directory
-   - `--label` <disklabel>: Process plots in the disks starting with the specified label pattern
-    - `--subdir` <subdir>: Process Plots in disk/<subdir>
+   - `--mount-dir </path/to/dir>`: Process Plots under the specified directory
+   - `--label <disklabel>`: Process plots in the disks starting with the specified label pattern
+   - `--subdir <subdir>`: Process Plots in `</path/to/disk>/<subdir>`
 
 ## Example
    
