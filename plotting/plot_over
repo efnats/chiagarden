@@ -30,6 +30,16 @@ function print_usage() {
     echo "Note: --mount-dir and --label cannot be used at the same time."
 }
 
+function check_duf_installed() {
+  if ! command -v duf >/dev/null 2>&1; then
+    echo ""
+    echo -e "${YELLOW}${BOLD}Duf-utility not found${RESET}"
+    echo -e "${RED}For a shiny table overview of your disks here, please install ${BOLD}duf${RESET} ${RED}from${RESET} ${CYAN}${BOLD}https://github.com/muesli/duf${RESET}"
+        return 1
+  fi
+  return 0
+}
+
 # Parse command-line arguments
 dry_run=false
 
@@ -117,7 +127,9 @@ while true; do
 
   echo
   echo "Disks that meet the requirements:"
-  duf ${free_disks[@]}
+  if check_duf_installed; then
+    duf ${free_disks[@]}
+  fi
   echo
 
 
