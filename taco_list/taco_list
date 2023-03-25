@@ -15,9 +15,9 @@ RESET="\033[0m"
 # Function to print usage text
 print_usage() {
     echo  "Usage:"
-    echo "./taco_plot --mount-dir /path/to/dir [--subdir subdir_name] [--format oneline|newline]"
+    echo "./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--format oneline|newline]"
     echo "or"
-    echo "./taco_plot --label CHIA [--subdir subdir_name] [--format oneline|newline]"
+    echo "./taco_list --label CHIA [--subdir subdir_name] [--format oneline|newline]"
 }
 
 # Parse command-line arguments
