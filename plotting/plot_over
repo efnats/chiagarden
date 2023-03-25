@@ -8,8 +8,7 @@ min_free_space=100 # minimum free space in GB
 amount_free_disks=5 # desired amount of disks with min_free_space
 replot_levels="0,1,2,3,4,5,6" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
 search_depth=10 # maximum search depth for plot files - how many subdir levels should we iterate?
-subdir=""
-interval=30 # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this realitely low (30s)
+interval=30 # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
 
 ###### No variables to change below ###############
 
@@ -21,6 +20,7 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
+subdir="" # Default parameter for your first subdirectory for plots in Disk. This is set in the commandline now.
 plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1*.plot' 'plot-k32-c2*.plot' 'plot-k32-c3*..plot' 'plot-k32-c4*.plot' 'plot-k32-c5*.plot' 'plot-k32-c6*.plot' 'plot-k32-c7*.plot' 'plot-k32-c8*.plot')
 min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
 IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
