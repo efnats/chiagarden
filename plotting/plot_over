@@ -106,13 +106,13 @@ while true; do
   disk_count="${#disks[@]}"
 
   if [ -n "$mount_dir" ]; then
-  echo -e "Watching a total of $disk_count drives in ${CYAN}$mount_dir*${RESET}"
+  echo -e "Watching a total of ${CYAN}$disk_count${RESET} drives in ${CYAN}$mount_dir*${RESET}"
     elif [ -n "$label" ]; then
-  echo -e "Watching a total of $disk_count drives labelled with the pattern ${CYAN}$label${RESET}"
+  echo -e "Watching a total of ${CYAN}$disk_count${RESET} drives labelled with the pattern ${CYAN}$label${RESET}"
   fi
 
-  echo "$amount_free_disks drives each required to have $min_free_space GB free space"
-  
+  echo -e "${CYAN}$amount_free_disks${RESET} drives each required to have ${CYAN}$min_free_space${RESET} GB free space"
+  echo -e "Plot levels marked for removal: ${CYAN}$replot_levels${RESET}"
   if [ "$dry_run" = true ]; then
     echo -e "${CYAN}DRY-RUN MODE - NOTHING WILL BE DELETED${RESET}"
   fi
@@ -128,12 +128,12 @@ while true; do
 
   echo
   if [ ${#free_disks[@]} -gt 0 ]; then
-    echo "(${#free_disks[@]}) drives meet the requirements:"
+    echo -e "${CYAN}${#free_disks[@]}${RESET} drives meet the requirements:"
     if check_duf_installed; then
       duf ${free_disks[@]}
     fi
   else
-    echo "No disks meet the requirements."
+    echo "No drives meet the requirements."
   fi
   echo
 
@@ -170,19 +170,18 @@ while true; do
       done
 
 if [ -n "$oldest_file" ]; then
-  timestamp=$(date)
-  echo -e "${CYAN}${timestamp}${RESET}"
+  echo -e "${CYAN}$(date)${RESET}"
   
   if [ "$dry_run" = true ]; then
     echo "DRY-RUN would remove $oldest_file"
   else
     echo "removing $oldest_file"
-    #chattr -i "$oldest_file"
+    chattr -i "$oldest_file"
     rm_output=$(rm -v "$oldest_file" 2>&1)
     echo "$rm_output"
     
     if [ -n "$logfile" ]; then
-      echo "${timestamp} - ${rm_output}" >> "$logfile"
+      echo "$(date) - ${rm_output}" >> "$logfile"
     fi
   fi
   echo
@@ -203,8 +202,14 @@ fi
         free_disks+=("$disk")
       fi
     done
-  done
+done
+  echo -e "${CYAN}$(date)${RESET}"
 
+  if [ "${#free_disks[@]}" -ge "$amount_free_disks" ]; then
+    echo -e "${CYAN}$amount_free_disks${RESET} drives with each ${CYAN}$min_free_space${RESET} GB free space found."
+  elif [ "$plot_found" == false ]; then
+    echo -e "No plots with Plot Compression level ${CYAN}$replot_levels${RESET} found."
+  fi
   echo "No more plots need to be removed for now."
   sleep $interval
 done
