@@ -9,6 +9,7 @@ amount_free_disks=5 # desired amount of disks with min_free_space
 replot_levels="0,1,2,3,4,5,6" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
 search_depth=10 # maximum search depth for plot files - how many subdir levels should we iterate?
 interval=30 # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
+logfile="/var/log/plot_over.log" # set to a valid path or leave empty to disable logging
 
 ###### No variables to change below ###############
 
@@ -105,12 +106,12 @@ while true; do
   disk_count="${#disks[@]}"
 
   if [ -n "$mount_dir" ]; then
-  echo -e "Watching a total of $disk_count disks in ${CYAN}$mount_dir*${RESET}"
+  echo -e "Watching a total of $disk_count drives in ${CYAN}$mount_dir*${RESET}"
     elif [ -n "$label" ]; then
-  echo -e "Watching a total of $disk_count disks labelled with the pattern ${CYAN}$label${RESET}"
+  echo -e "Watching a total of $disk_count drives labelled with the pattern ${CYAN}$label${RESET}"
   fi
 
-  echo "$amount_free_disks disks each required to have $min_free_space GB free space"
+  echo "$amount_free_disks drives each required to have $min_free_space GB free space"
   
   if [ "$dry_run" = true ]; then
     echo -e "${CYAN}DRY-RUN MODE - NOTHING WILL BE DELETED${RESET}"
@@ -126,9 +127,13 @@ while true; do
   done
 
   echo
-  echo "Disks that meet the requirements:"
-  if check_duf_installed; then
-    duf ${free_disks[@]}
+  if [ ${#free_disks[@]} -gt 0 ]; then
+    echo "(${#free_disks[@]}) drives meet the requirements:"
+    if check_duf_installed; then
+      duf ${free_disks[@]}
+    fi
+  else
+    echo "No disks meet the requirements."
   fi
   echo
 
@@ -164,17 +169,25 @@ while true; do
         fi
       done
 
-      if [ -n "$oldest_file" ]; then
-        if [ "$dry_run" = true ]; then
-          echo -e "${CYAN}DRY-RUN${RESET} would remove $oldest_file"
-        else
-          echo "removing $oldest_file"
-          chattr -i "$oldest_file"
-          rm -v "$oldest_file"
-        fi
-        echo
-        plot_found=true
-      fi
+if [ -n "$oldest_file" ]; then
+  timestamp=$(date)
+  echo -e "${CYAN}${timestamp}${RESET}"
+  
+  if [ "$dry_run" = true ]; then
+    echo "DRY-RUN would remove $oldest_file"
+  else
+    echo "removing $oldest_file"
+    #chattr -i "$oldest_file"
+    rm_output=$(rm -v "$oldest_file" 2>&1)
+    echo "$rm_output"
+    
+    if [ -n "$logfile" ]; then
+      echo "${timestamp} - ${rm_output}" >> "$logfile"
+    fi
+  fi
+  echo
+  plot_found=true
+fi
 
       if [ "$plot_found" == true ]; then
         sleep 4
