@@ -79,6 +79,7 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
    - `replot_levels`: comma-separated list of plot compression levels that may be replotted
    - `amount_free_disks`: desired number of disks with minimum free space (e.g., 10)
    - `interval`: rescan interval in seconds (default is 30 seconds)
+   - `logfile`: set to `/path/to/file.log` or leave empty (`""`)
      
 2. To run the script make sure to make it executable first
 
