@@ -5,7 +5,7 @@ When mounting drives, the script will print all mount entries with their corresp
 
 ## Requirements
 
-- mergerfs https://github.com/trapexit/mergerfs (only for mounting all disks in a single-drive-like Filesystem, not required for mounting the disks)
+- mergerfs https://github.com/trapexit/mergerfs (only for mounting all disks in a single-drive-like filesystem, not required for mounting the disks)
 - have your disks labelled with a unified pattern (see chiainit)
 
 ## Usage
