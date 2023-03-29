@@ -46,7 +46,7 @@ The script has the following command-line options:
 
 # garden-mount systemd services
 
-The `chiamount` command will output required fstab entry lines for your CHIA disks and for combining all disks into a Union Filesystem in MergerFS. To make all your mount points persisent you can simply copy this output and paste it into your /etc/fstab. HOWEVER, if you are running a linux distribution that supports `systemd` like Debian or Ubuntu, you may consider using the provided systemd service files instead. Those will enable you to finetune your dependencies. For example you may want to make sure that your mounts are set before your docker.service is run. If you decide to use systemd you probably know how to modify these according to your needs.
+The `chiamount` command will output all required fstab entry lines for your CHIA disks and for combining all disks into a Union Filesystem in MergerFS. To make all your mount points persisent you can simply copy this output and paste it into your /etc/fstab. HOWEVER, if you are running a linux distribution that supports `systemd` like Debian or Ubuntu, you may consider using the provided systemd service files instead. Those will enable you to finetune your dependencies. For example you may want to make sure that your mounts are set before your docker.service is run. If you decide to use systemd you probably know how to modify these according to your needs.
 
 ## mnt-chia-drives.service
 
@@ -69,7 +69,7 @@ The `mnt-garden.mount` is a systemd service that is responsible for mounting a m
 
 This service ensures that the mergerfs volume is mounted after all Chia-labelled drives have been successfully mounted by the mnt-chia-drives.service. The mergerfs volume is created using the fuse.mergerfs file system type, with mfs (most free space) policy enabled. This makes sure that that writing to the merger filesystem will allocate as many disks as possible during plotting for better peformance. See https://github.com/trapexit/mergerfs
 
-NOTE! It is currently not recommended to use the mergerfs mount point for farming in larger (+20 disks) environments as there are some peformance drawbacks that may result in longer seek times. The aswesome author of mergerfs is aware of the CHIA community using mergerfs and may have hints: https://www.reddit.com/r/chia/comments/o7pxpz/mergerfs_and_chia/
+NOTE! It is currently not recommended to use the mergerfs mount point for *farming* in larger (+20 disks) environments as there are some peformance drawbacks that may result in longer seek times. Using it for managing your plots like copying plots and organizing (sub)folders on multiple disks is fantastic. The aswesome author of mergerfs is aware of the CHIA community using mergerfs and may have hints: https://www.reddit.com/r/chia/comments/o7pxpz/mergerfs_and_chia/
 
 ### Usage
 
