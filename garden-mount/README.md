@@ -1,6 +1,7 @@
 # chiamount - Mass disk (un)mounter for PoST farming
 
 This script helps you mount or unmount Chia-labelled drives based on a specified label prefix. Additionally, this repository provides two systemd service files for managing the mounting and unmounting process.
+When mounting drives, the script will print all mount entries with their corresponding UUIDs in a format directly usable in /etc/fstab for easy copy/pasting. But please consider using the systemd services provided (this is the way).
 
 ## Requirements
 
@@ -15,7 +16,7 @@ The script has the following command-line options:
 - `--unmount`: Unmounts the drives with the specified label prefix
 - `--label LABEL_PREFIX`: Specifies the label prefix to use for matching drives (default: CHIA)
 - `--read-only`: Mounts the drives as read-only (only applicable with `--mount`)
-- `--mount-point`: Mounts the drives into thes specified mountpoint (default: /media/[username]))
+- `--mount-point`: Mounts the drives into thes specified mountpoint (default: /media/[username])
 
 #### Examples
 
