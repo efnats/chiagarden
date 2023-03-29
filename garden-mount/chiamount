@@ -57,6 +57,8 @@ if [ -z "$mount_point" ]; then
     mount_point="/media/$username"
 fi
 
+mounted_devices=()
+
 if [ "$action" == "mount" ]; then
     mount_options="rw,noatime"
     if [ "$read_only" == "yes" ]; then
@@ -67,7 +69,7 @@ if [ "$action" == "mount" ]; then
         device=$(readlink -f "$disk")
         disk_mount_point="$mount_point/$(basename "$disk")"
         mkdir -p "$disk_mount_point"
-        mount -v -o "$mount_options" "$device" "$disk_mount_point"
+        mount -v -o "$mount_options" "$device" "$disk_mount_point" && mounted_devices+=("$device")
         found_disks=1
     done < <(find /dev/disk/by-label -name "$label_pattern")
 elif [ "$action" == "unmount" ]; then
@@ -77,7 +79,7 @@ elif [ "$action" == "unmount" ]; then
         if [ -n "$mount_info" ]; then
             read -r mounted_device mounted_path <<<"$mount_info"
             umount -v "$mounted_device"
-            found_disks=1
+             found_disks=1
         fi
     done < <(find /dev/disk/by-label -name "$label_pattern")
 else
@@ -87,4 +89,21 @@ fi
 
 if [ "$found_disks" -eq 0 ]; then
     echo "No disks found with the label pattern: $label_pattern"
+fi
+
+if [ "$action" == "mount" ] && [ ${#mounted_devices[@]} -gt 0 ]; then
+    echo
+    echo "# Add these entries to /etc/fstab to make mounting of your CHIA drives persistant"
+    echo "or (better!) use the systemd services provided in the chiagarden repository"
+    echo ""
+    for device in "${mounted_devices[@]}"; do
+        uuid=$(blkid -s UUID -o value "$device")
+        mount_info=$(findmnt -n -o TARGET,OPTIONS "$device")
+        if [ -n "$mount_info" ]; then
+            read -r mounted_path mounted_options <<<"$mount_info"
+            fstype=$(blkid -s TYPE -o value "$device")
+            echo "UUID=$uuid $mounted_path $fstype $mounted_options 0 0"
+        fi
+    done
+    echo ""
 fi
