@@ -44,8 +44,8 @@ The `mnt-chia-drives.service` is a systemd service that is responsible for autom
 
 ### Usage
 
+Copy the systemd services to their directories and start/enable the service
 ```bash
-# Copy the systemd services to their directories and start/enable the service
 sudo cp mnt-chia-drives.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl start mnt-chia.drives.service
@@ -63,8 +63,8 @@ NOTE! It is currently not recommended to use the mergerfs mount point for farmin
 
 ### Usage
 
+Copy the systemd services to their directories and start/enable the service
 ```bash
-# Copy the systemd services to their directories and start/enable the service
 sudo cp mergerfs.service /etc/systemd/system/mnt-garden.mount
 sudo systemctl daemon-reload
 sudo systemctl start mnt-garden.mount
