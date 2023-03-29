@@ -33,7 +33,7 @@ The script has the following command-line options:
 ./chiamount --mount --label GIGA --read-only --mount-point /mnt/16TB-drives
 ```
 
-3. Mount all drives with the label prefix 'CHIA' in /meda/root and mount these disks in a single-drive-like Filesystem in /mnt/garden using MergerFS:
+3. Mount all drives with the label prefix 'CHIA' in /meda/root and mount these disks in a single-drive-like filesystem in /mnt/garden using MergerFS:
 
 ```bash
 ./chiamount --mount --mergerfs
