@@ -5,7 +5,7 @@ When mounting drives, the script will print all mount entries with their corresp
 
 ## Requirements
 
-- mergerfs https://github.com/trapexit/mergerfs
+- mergerfs https://github.com/trapexit/mergerfs (only for mounting all disks in a single-drive-like Filesystem, not required for mounting the disks)
 - have your disks labelled with a unified pattern (see chiainit)
 
 ## Usage
@@ -16,7 +16,8 @@ The script has the following command-line options:
 - `--unmount`: Unmounts the drives with the specified label prefix
 - `--label LABEL_PREFIX`: Specifies the label prefix to use for matching drives (default: CHIA)
 - `--read-only`: Mounts the drives as read-only (only applicable with `--mount`)
-- `--mount-point`: Mounts the drives into thes specified mountpoint (default: /media/[username])
+- `--mount-point [PATH]`: Mounts the drives into thes specified mountpoint (default: /media/[username])
+- `--mergerfs [PATH]`: Use MergerFS to combine the mounted devices into a single drive-like filesystem. (default: /mnt/garden)
 
 #### Examples
 
@@ -32,7 +33,13 @@ The script has the following command-line options:
 ./chiamount --mount --label GIGA --read-only --mount-point /mnt/16TB-drives
 ```
 
-3. Unmount all drives withe label CHIA (previously mounted on any mountpoint)
+3. Mount all drives with the label prefix 'CHIA' in /meda/root and mount these disks in a single-drive-like Filesystem in /mnt/garden using MergerFS:
+
+```bash
+./chiamount --mount --mergerfs
+```
+
+4. Unmount all drives withe label CHIA (previously mounted on any mountpoint)
 ```bash
 ./chiamount --unmount
 ```
@@ -65,6 +72,7 @@ NOTE! It is currently not recommended to use the mergerfs mount point for farmin
 
 Copy the systemd services to their directories and start/enable the service
 ```bash
+sudo mkdir -p /mnt/garden
 sudo cp mergerfs.service /etc/systemd/system/mnt-garden.mount
 sudo systemctl daemon-reload
 sudo systemctl start mnt-garden.mount

@@ -1,8 +1,27 @@
 #!/bin/bash
 
 usage() {
-    echo "Usage: $0 [--mount|--unmount] [--label LABEL_PREFIX] [--read-only] [--mount-point MOUNT_POINT]"
+    echo "Usage: $0 [--mount|--unmount] [--label LABEL_PREFIX] [--read-only] [--mount-point MOUNT_POINT] [--mergerfs [MERGERFS_PATH]]"
     echo "Example: $0 --mount --label 'CHIA'"
+    exit 1
+}
+
+help() {
+    echo "Mounts or unmounts devices with a specified label prefix."
+    echo
+    echo "Usage: $0 [--mount|--unmount] [--label LABEL_PREFIX] [--read-only] [--mount-point MOUNT_POINT] [--mergerfs [MERGERFS_PATH]]"
+    echo
+    echo "Options:"
+    echo "  --mount              Mount devices with the specified label prefix."
+    echo "  --unmount            Unmount devices with the specified label prefix. Unmount the MergerFS mountpoint if it exists."
+    echo "  --label PREFIX       Specify the label prefix of the devices to mount/unmount (default: 'CHIA')."
+    echo "  --read-only          Mount devices as read-only."
+    echo "  --mount-point PATH   Specify the mount point base directory (default: '/media/username')."
+    echo "  --mergerfs [PATH]    Use MergerFS to combine the mounted devices into a single drive-like filesystem. (default: '/mnt/garden')"
+    echo "  --help               Display this help message and exit."
+    echo
+    echo "Example:"
+    echo "  $0 --mount --label 'CHIA' --mergerfs"
     exit 1
 }
 
@@ -14,6 +33,7 @@ action=""
 label_prefix="CHIA"
 read_only=""
 mount_point=""
+mergerfs_path=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -36,6 +56,18 @@ while [ "$#" -gt 0 ]; do
         --mount-point)
             mount_point="$2"
             shift 2
+            ;;
+        --mergerfs)
+            if [ -z "$2" ] || [[ "$2" == --* ]]; then
+                mergerfs_path="/mnt/garden"
+            else
+                mergerfs_path="$2"
+                shift
+            fi
+            shift
+            ;;
+        --help)
+            help
             ;;
         *)
             echo "Unknown argument: $1"
@@ -72,14 +104,38 @@ if [ "$action" == "mount" ]; then
         mount -v -o "$mount_options" "$device" "$disk_mount_point" && mounted_devices+=("$device")
         found_disks=1
     done < <(find /dev/disk/by-label -name "$label_pattern")
+
+    if [ -n "$mergerfs_path" ] && [ ${#mounted_devices[@]} -gt 0 ]; then
+        mkdir -p "$mergerfs_path"
+        mergerfs_mount_options="use_ino,cache.files=full,minfreespace=5G,moveonenospc=true,dropcacheonclose=true,allow_other,fsname=garden,category.create=mfs"
+        mergerfs_sources=""
+        for device in "${mounted_devices[@]}"; do
+            mount_info=$(findmnt -n -o TARGET "$device")
+            if [ -n "$mount_info" ]; then
+                mergerfs_sources+="$mount_info:"
+            fi
+        done
+        mergerfs_sources="${mergerfs_sources::-1}"  # Remove the trailing colon
+        mergerfs -o "$mergerfs_mount_options" "$mergerfs_sources" "$mergerfs_path"
+        echo "mounting $mount_point/$label_prefix* to $mergerfs_path using MergerFS"
+    fi
+
 elif [ "$action" == "unmount" ]; then
+    # Unmount the fuse.mergerfs filesystem with the fsname garden first
+    mergerfs_mount_info=$(findmnt -t fuse.mergerfs -n -o SOURCE,TARGET,OPTIONS)
+    if [ -n "$mergerfs_mount_info" ]; then
+        read -r mergerfs_source mergerfs_target mergerfs_options <<<"$mergerfs_mount_info"
+        umount -v "$mergerfs_target"
+    fi
+
+    # Unmount the other disks
     while IFS= read -r disk; do
         device=$(readlink -f "$disk")
         mount_info=$(findmnt -n -o SOURCE,TARGET "$device")
         if [ -n "$mount_info" ]; then
             read -r mounted_device mounted_path <<<"$mount_info"
             umount -v "$mounted_device"
-             found_disks=1
+            found_disks=1
         fi
     done < <(find /dev/disk/by-label -name "$label_pattern")
 else
@@ -96,6 +152,7 @@ if [ "$action" == "mount" ] && [ ${#mounted_devices[@]} -gt 0 ]; then
     echo "# Add these entries to /etc/fstab to make mounting of your CHIA drives persistant"
     echo "or (better!) use the systemd services provided in the chiagarden repository"
     echo ""
+    echo "# CHIA disks"
     for device in "${mounted_devices[@]}"; do
         uuid=$(blkid -s UUID -o value "$device")
         mount_info=$(findmnt -n -o TARGET,OPTIONS "$device")
@@ -106,4 +163,12 @@ if [ "$action" == "mount" ] && [ ${#mounted_devices[@]} -gt 0 ]; then
         fi
     done
     echo ""
+
+    # Output corresponding line for fstab (after the other mountpoint lines)
+    if [ -n "$mergerfs_path" ]; then
+        mergerfs_fstab_line="$mount_point/$label_prefix* $mergerfs_path fuse.mergerfs $mergerfs_mount_options 0 0"
+        echo "# MergerFS"
+        echo "$mergerfs_fstab_line"
+    fi
 fi
+
