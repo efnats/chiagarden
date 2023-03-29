@@ -42,6 +42,23 @@ The script has the following command-line options:
 
 The `mnt-chia-drives.service` is a systemd service that is responsible for automatically mounting and unmounting all Chia-labelled drives on your system in /media/root/. This service ensures that your Chia-labelled drives are properly mounted when your system starts up, and unmounted when it shuts down. It relies on the /usr/local/bin/chiamount to perform the actual (un)mounting actions. You can modify the service accordingly if your drives have a different label-prefix by adding the --label [label] command (see chiamount)
 
+### Usage
+
+```bash
+# Copy the systemd services to their directories
+sudo cp mnt-chia-drives.service /etc/systemd/system/
+
+# Reload the systemd daemon
+sudo systemctl daemon-reload
+
+# Start the mnt-garden mount
+sudo systemctl start mnt-chia.drives.service
+
+# enable the service upon next boot (if desired)
+sudo systemctl enable mnt-chia.drives.service
+```
+
+
 ## mnt-garden.mount
 
 The `mnt-garden.mount` is a systemd service that is responsible for mounting a mergerfs volume in /mnt/garden/, which combines multiple Chia-labelled disks into a single, unified file system. The service is dependent and will automatically call mount-chia-drive.service.
@@ -54,7 +71,6 @@ NOTE! It is currently not recommended to use the mergerfs mount point for farmin
 
 ```bash
 # Copy the systemd services to their directories
-sudo cp mnt-chia-drives.service /etc/systemd/system/
 sudo cp mergerfs.service /etc/systemd/system/mnt-garden.mount
 
 # Reload the systemd daemon
@@ -65,7 +81,6 @@ sudo systemctl start mnt-garden.mount
 
 # enable the service upon next boot (if desired)
 sudo systemctl enable mnt-garden.mount
-sudo systemctl enable mnt-chia.drives.service
 ```
 
 
