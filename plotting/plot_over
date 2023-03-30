@@ -5,10 +5,10 @@
 ################################################
 
 min_free_space=100 # minimum free space in GB
-amount_free_disks=10 # desired amount of disks with min_free_space
+amount_free_disks=5 # desired amount of disks with min_free_space
 replot_levels="0,1,2,3,4,5,6" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
 search_depth=10 # maximum search depth for plot files - how many subdir levels should we iterate?
-interval=10 # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
+interval=25 # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
 logfile="/var/log/plot_over.log" # set to a valid path or leave empty to disable logging
 display_search_paths="false"
 ###### No variables to change below ###############
@@ -186,6 +186,7 @@ function display_free_disks_info() {
     echo -e "${CYAN}${#free_disks[@]}${RESET} drives meet the requirements:"
     if check_duf_installed; then
       duf ${free_disks[@]}
+      echo ""
     fi
   else
       echo "No drives meet the requirements. Marking plots for removal."
@@ -274,7 +275,7 @@ function process_plot_files() {
       fi
     done
   else
-    echo "${CYAN}$(date)${RESET} There are enough free disks. No need to remove plot files."
+    echo -e "${CYAN}$(date)${RESET} There are enough free disks. No need to remove plot files."
   fi
 }
 
