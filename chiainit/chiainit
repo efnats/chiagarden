@@ -17,38 +17,38 @@ BOLD="\033[1m"
 RESET="\033[0m"
 
 VERSION="V2"
-
-# Function to check if a drive has a root partition
-is_system_drive() {
-    drive=$1
-    root_partition=$(df --output=source / | tail -1)
-    echo $root_partition | grep -q "^/dev/${drive}"
-    return $?
-}
+ACTION=""
+FSTYPE=""
 
 # Function to retrieve the serial number of a drive
 get_serial_number() {
     drive=$1
     serial_number=$(sudo smartctl -i /dev/$drive | grep -i "Serial Number" | awk  '{ print $3 }')
-    echo "$serial_number"
+    if [ -z "$serial_number" ]; then
+        echo "UNKNOWN"
+    else
+        echo "$serial_number"
+    fi
 }
+
 
 # Function to get the label of a drive
 get_label() {
     partition=$1
+    readlabel=""
 
     case "$FSTYPE" in
         xfs)
-            label=$(sudo xfs_admin -l /dev/$partition 2>/dev/null | awk '{print $3}')
+            readlabel=$(sudo xfs_admin -l /dev/$partition 2>/dev/null | awk '{print $3}')
             ;;
         ext4)
-            label=$(sudo e2label /dev/$partition 2>/dev/null)
+            readlabel=$(sudo e2label /dev/$partition 2>/dev/null)
             ;;
         ntfs)
-            label=$(sudo ntfslabel /dev/$partition 2>/dev/null)
+            readlabel=$(sudo ntfslabel /dev/$partition 2>/dev/null)
             ;;
     esac
-    echo "$label"
+    echo "$readlabel"
 }
 
 # Confirm destructive actions
@@ -87,9 +87,10 @@ summarize_actions() {
     affected_drives=${affected_drives%, }
 
     #echo "The following actions will be performed:"
-    echo -e "Actions performed: ${BOLD}${ACTION#--}${RESET}"
-    echo -e "Drives affected  : ${BOLD}$affected_drives${RESET}"
-    echo
+    echo -e "Drives  : ${BOLD}$affected_drives${RESET}"
+    echo -e "Actions : ${BOLD}${ACTION#--}${RESET}"
+    echo -e "FSTYPE  : ${BOLD}$FSTYPE${RESET}"
+    echo ""
 
     if [ "$ntfs_warning" = true ]; then
         echo -e "${RED}WARNING!!${RESET}${BOLD} There is a potential risk for data corruption when using NTFS-3G for Windows. DONT USE IT FOR YOUR FARM!!${RESET}"
@@ -169,6 +170,39 @@ init() {
     execute_action "--label" $drive
 }
 
+# Function to check if a drive has a root partition
+is_system_drive() {
+    drive=$1
+    root_partition=$(df --output=source / | tail -1)
+    echo $root_partition | grep -q "^/dev/${drive}[0-9]*"
+    return $?
+}
+
+# Function to check if each specified drive exists
+check_drives_exist() {
+    for drive in "${DRIVES[@]}"; do
+        if ! [ -b "/dev/${drive}" ]; then
+            echo -e "${RED}Error:${RESET} Drive /dev/$drive does not exist."
+            exit 1
+        fi
+    done
+}
+
+
+# Function to check if any of the specified drives are mounted
+check_drives_mounted() {
+    for drive in "${DRIVES[@]}"; do
+        if grep -qs "/dev/${drive}[0-9]*" /proc/mounts; then
+            echo -e "${RED}Error:${RESET} Drive /dev/$drive is mounted. Please unmount it before continuing."
+            exit 1
+        fi
+    done
+}
+
+
+
+
+
 # Function to display the help text
 help() {
     display_version
@@ -214,7 +248,7 @@ spinner() {
     local pid=$1
     local delay=0.05
     local spinstr='|/-\'
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+    while pgrep -x -P $pid > /dev/null; do
         local temp=${spinstr#?}
         printf " [%c]  " "$spinstr"
         local spinstr=$temp${spinstr%"$temp"}
@@ -224,6 +258,7 @@ spinner() {
     printf "    \b\b\b\b"
     echo -e "${GREEN}OK${RESET}"
 }
+
 
 
 # Execute action
@@ -238,16 +273,14 @@ execute_action() {
             echo -e ""
             init $drive &
             pid=$!
-            #spinner $pid
             wait $pid
-            #echo -e " OK"
             ;;
         --wipe)
             echo -ne "  ${YELLOW}Wiping /dev/$drive...${RESET}"
             echo -e ""
             wipe $drive &
             pid=$!
-            spinner $pid
+            #spinner $pid
             wait $pid
             ;;
         --format)
@@ -255,7 +288,7 @@ execute_action() {
             echo -e ""
             format $drive &
             pid=$!
-            spinner $pid
+            #spinner $pid
             wait $pid
             ;;
         --label)
@@ -265,14 +298,11 @@ execute_action() {
             drive_label=$(get_label "${drive}1")
             echo -e "  ${CYAN}New label: ${RESET}${drive_label}"
             pid=$!
-            spinner $pid
+            #spinner $pid
             wait $pid
             ;;
     esac
 }
-
-ACTION=""
-FSTYPE=""
 
 
 # Process the command-line arguments
@@ -311,24 +341,33 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-display_version
+# Check for valid FSystem entry
+function check_fstype_issued() {
+if { [ "$ACTION" == "--format" ] || [ "$ACTION" == "--label" ] || [ "$ACTION" == "--init" ]; } && [ -z "$FSTYPE" ]; then
+    echo "Error: Missing filesystem type for format or label action."
+    display_usage
+    exit 1
+fi
+}
+
+
+# Main
+
+#display_version
 
 if [ -z "$ACTION" ]; then
     display_help
     exit 1
 fi
 
-# Confirm destructive actions
-if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; then
-    summarize_actions
-    confirm_destructive_action "${DRIVES[@]}"
-fi
+check_fstype_issued
+check_drives_exist
+check_drives_mounted
+summarize_actions
 
-# Check for valid FSystem entry
-if { [ "$ACTION" == "--format" ] || [ "$ACTION" == "--label" ]; } && [ -z "$FSTYPE" ]; then
-    echo "Error: Missing filesystem type for format or label action."
-    display_help
-    exit 1
+# Check for and confirm destructive actions
+if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; then
+    confirm_destructive_action "${DRIVES[@]}"
 fi
 
 # Iterate through the provided arguments and call the corresponding functions based on the action
