@@ -5,12 +5,12 @@
 ################################################
 
 min_free_space=100 # minimum free space in GB
-amount_free_disks=5 # desired amount of disks with min_free_space
+amount_free_disks=10 # desired amount of disks with min_free_space
 replot_levels="0,1,2,3,4,5,6" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
 search_depth=10 # maximum search depth for plot files - how many subdir levels should we iterate?
-interval=30 # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
+interval=10 # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
 logfile="/var/log/plot_over.log" # set to a valid path or leave empty to disable logging
-
+display_search_paths="false"
 ###### No variables to change below ###############
 
 # Add color variables and bold
@@ -22,24 +22,10 @@ BOLD="\033[1m"
 RESET="\033[0m"
 
 subdir="" # Default parameter for your first subdirectory for plots in Disk. This is set in the commandline now.
-plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1*.plot' 'plot-k32-c2*.plot' 'plot-k32-c3*..plot' 'plot-k32-c4*.plot' 'plot-k32-c5*.plot' 'plot-k32-c6*.plot' 'plot-k32-c7*.plot' 'plot-k32-c8*.plot')
+plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1*.plot' 'plot-k32-c2*.plot' 'plot-k32-c3*..plot' 'plot-k32-c4*.plot' 'plot-k32-c5*.plot' 'plot-k32-c6*.plot' 'plot-k32-c7*.plot' 'plot-k32-c8*.plot' 'plot-k32-c9*.plot')
 min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
 IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
 
-function print_usage() {
-    echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label]"
-    echo "Note: --mount-dir and --label cannot be used at the same time."
-}
-
-function check_duf_installed() {
-  if ! command -v duf >/dev/null 2>&1; then
-    echo ""
-    echo -e "${YELLOW}${BOLD}Duf-utility not found${RESET}"
-    echo -e "${RED}For a shiny table overview of your disks here, please install ${BOLD}duf${RESET} ${RED}from${RESET} ${CYAN}${BOLD}https://github.com/muesli/duf${RESET}"
-        return 1
-  fi
-  return 0
-}
 
 # Parse command-line arguments
 dry_run=false
@@ -62,7 +48,11 @@ while [[ "$#" -gt 0 ]]; do
         --subdir)
             subdir="$2"
             shift 2
-            ;;    
+            ;;
+        --help)
+            print_help
+            exit 0
+            ;;
         *)
             echo "Unknown argument: $1"
             print_usage
@@ -71,38 +61,73 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-## Check if the user has provided the required arguments
-if [ -z "$mount_dir" ] && [ -z "$label" ]; then
+# Print help text
+function print_help() {
+    echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label] [--subdir subdir] [--help]"
+    echo ""
+    echo "Arguments:"
+    echo "  --dry-run          Run the script without actually deleting any plot files."
+    echo "  --interval         Set the interval in seconds between consecutive scans for plot files to remove."
+    echo "  --mount-dir        Set the base directory where your plot drives are mounted (e.g., /mnt/plots/)."
+    echo "  --label            Use this flag if you want the script to search for drives with a specific label pattern."
+    echo "  --subdir           Set the subdirectory within the drives where plot files are located."
+    echo "  --help             Display this help message and exit."
+    echo ""
+    echo "Note: --mount-dir and --label cannot be used at the same time."
+}
+
+
+# Print usage
+function print_usage() {
+    echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label]"
+    echo "Note: --mount-dir and --label cannot be used at the same time."
+}
+
+# Check if duf is installed
+function check_duf_installed() {
+  if ! command -v duf >/dev/null 2>&1; then
+    echo ""
+    echo -e "${YELLOW}${BOLD}Duf-utility not found${RESET}"
+    echo -e "${RED}For a shiny table overview of your disks here, please install ${BOLD}duf${RESET} ${RED}from${RESET} ${CYAN}${BOLD}https://github.com/muesli/duf${RESET}"
+        return 1
+  fi
+  return 0
+}
+
+# Validate the command-line arguments
+function validate_arguments() {
+  if [ -z "$mount_dir" ] && [ -z "$label" ]; then
     print_usage
     exit 1
-fi
+  fi
 
-# Check if both --mount-dir and --label are provided
-if [ -n "$mount_dir" ] && [ -n "$label" ]; then
+  if [ -n "$mount_dir" ] && [ -n "$label" ]; then
     echo "Error: Both --mount-dir and --label cannot be used at the same time."
     print_usage
     exit 1
-fi
+  fi
+}
 
-# If --label is provided, find the mount points matching the label
-if [ -n "$label" ]; then
-  IFS=$'\n' read -rd '' -a disks < <(lsblk -o NAME,LABEL,MOUNTPOINT | awk -v label="$label" '$2 ~ "^"label {print $3}')
-else
-  # If --mount-dir is provided, use it as the base directory for directories with the pattern "CHIA-*"
-  disks=("$mount_dir"*)
-fi
+# Find disks based on input parameters
+function find_disks() {
+  # If --label is provided, find the mount points matching the label
+  if [ -n "$label" ]; then
+    IFS=$'\n' read -rd '' -a disks < <(lsblk -o NAME,LABEL,MOUNTPOINT | awk -v label="$label" '$2 ~ "^"label {print $3}')
+  else
+    # If --mount-dir is provided, use it as the base directory for directories with the pattern "CHIA-*"
+    disks=("$mount_dir"*)
+  fi
 
-# Append subdir to each disk if provided
-if [ -n "$subdir" ]; then
-  for i in "${!disks[@]}"; do
-    disks[i]="${disks[i]}/$subdir"
-  done
-fi
+  # Append subdir to each disk if provided
+  if [ -n "$subdir" ]; then
+    for i in "${!disks[@]}"; do
+      disks[i]="${disks[i]}/$subdir"
+    done
+  fi
+}
 
-while true; do
-  clear
-
-  # Count the number of disks
+# Display information about the script's settings and monitored disks
+function display_info() {
   disk_count="${#disks[@]}"
 
   if [ -n "$mount_dir" ]; then
@@ -114,10 +139,31 @@ while true; do
   echo -e "${CYAN}$amount_free_disks${RESET} drives each required to have ${CYAN}$min_free_space${RESET} GB free space"
   echo -e "Plot levels marked for removal: ${CYAN}$replot_levels${RESET}"
   if [ "$dry_run" = true ]; then
+    echo ""
     echo -e "${CYAN}DRY-RUN MODE - NOTHING WILL BE DELETED${RESET}"
+    echo ""
   fi
+  if [ "$display_search_paths" = true ]; then
+  search_path_output
+  fi
+}
 
-   free_disks=()
+
+## Detailed info about paths to include for searching plot files
+function search_path_output() {
+    echo ""
+    #echo -e "${YELLOW}Debugging output:${RESET}"
+     echo "Processing the following directories:"
+      for disk in "${disks[@]}"; do
+        echo "  - $disk"
+      done
+    #echo -e "${YELLOW}End of debugging output${RESET}"
+    echo ""
+}
+
+# Count the number of disks and set skip_search=true if amount >= than desired disks
+ function get_free_disks() {
+  free_disks=()
 
   for disk in "${disks[@]}"; do
     free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
@@ -126,90 +172,121 @@ while true; do
     fi
   done
 
-  echo
+  if [ "${#free_disks[@]}" -ge "$amount_free_disks" ]; then
+    enough_free_disks=true
+  else
+    enough_free_disks=false
+  fi
+}
+
+# Display information about free disks
+function display_free_disks_info() {
+  get_free_disks
   if [ ${#free_disks[@]} -gt 0 ]; then
     echo -e "${CYAN}${#free_disks[@]}${RESET} drives meet the requirements:"
     if check_duf_installed; then
       duf ${free_disks[@]}
     fi
   else
-    echo "No drives meet the requirements."
+      echo "No drives meet the requirements. Marking plots for removal."
   fi
-  echo
+}
 
 
-  ## Debugging output - List of directories being processed
-  if [ "$dry_run" = true ]; then
-      echo -e "${YELLOW}Debugging output:${RESET}"
-      echo "Processing the following directories:"
-      for disk in "${disks[@]}"; do
-        echo "  - $disk"
+# Find the oldest plot over the entire disk array matching the given pattern
+function find_oldest_plot() {
+  local level=$1
+  oldest_file=""
+  oldest_timestamp=$(date +%s)
+  file_count=0
+
+  for disk in "${disks[@]}"; do
+    find_output=$(find "$disk" -maxdepth "$search_depth" -type f -name "${plot_patterns[$level]}" -printf '%T@ %p\n' 2>/dev/null)
+
+    if [ -n "$find_output" ]; then
+      while IFS= read -r line; do
+        timestamp=$(echo "$line" | awk '{print $1}')
+        file=$(echo "$line" | awk '{print $2}')
+
+        if [ "$(echo "$timestamp < $oldest_timestamp" | bc)" -eq 1 ]; then
+          oldest_timestamp=$timestamp
+          oldest_file=$file
+        fi
+        file_count=$((file_count + 1))
+      done <<< "$find_output"
+    fi
   done
-  echo -e "${YELLOW}End of debugging output${RESET}"
-  fi
+}
 
-  while [ "${#free_disks[@]}" -lt "$amount_free_disks" ]; do
-    plot_found=false
 
-    for plot_pattern_index in "${replot_levels_arr[@]}"; do
-      plot_pattern="${plot_patterns[$plot_pattern_index]}"
-      least_free_space_disk=""
-      oldest_file=""
+# Remove identified plot and log action into logfile
+function remove_oldest_plot() {
+  if [ -n "$oldest_file" ]; then
+    #echo -e "${CYAN}$(date)${RESET}"
+    
+    if [ "$dry_run" = true ]; then
+      echo -e "${CYAN}$(date)${RESET} DRY-RUN would remove $oldest_file"
+    else
+      echo -e "${CYAN}$(date)${RESET} removing $oldest_file"
+      #chattr -i "$oldest_file"
+      rm_output=$(rm -v "$oldest_file" 2>&1)
+      echo -e "${CYAN}$(date)${RESET} $rm_output"
+      
+      if [ -n "$logfile" ]; then
+        echo "$(date) - ${rm_output}" >> "$logfile"
+      fi
+    fi
+    echo
+    plot_removed=true
+    fi
+}
 
-      for disk in "${disks[@]}"; do
-        matching_files=$(find "$disk" -maxdepth "$search_depth" -name "$plot_pattern")
+# Find and remove the oldest plot file based on the provided compression level or skip in certain conditions
+function process_plot_files() {
+  get_free_disks
 
-        if [ -n "$matching_files" ]; then
-          free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
-          if [ "$free_space" -lt "$min_free_space_bytes" ]; then
-            least_free_space_disk="$disk"
-            oldest_file=$(find "$disk" -maxdepth 2 -name "$plot_pattern" -printf '%T@ %p\n' | sort | head -n 1 | cut -d ' ' -f 2)
+  if [ "$enough_free_disks" = false ]; then
+    no_matching_plots_found=false
+
+    while [ "$enough_free_disks" = false ] && [ "$no_matching_plots_found" = false ]; do
+      plot_removed=false
+
+      echo -e "${CYAN}$(date)${RESET} Finding next plot for removal.."
+
+      for level in "${replot_levels_arr[@]}"; do
+        if [ "$plot_removed" = false ]; then
+          find_oldest_plot "$level"
+          remove_oldest_plot
+          if [ "$plot_removed" = true ]; then
+            sleep 2
             break
           fi
         fi
       done
 
-if [ -n "$oldest_file" ]; then
-  echo -e "${CYAN}$(date)${RESET}"
-  
-  if [ "$dry_run" = true ]; then
-    echo "DRY-RUN would remove $oldest_file"
+      # Update the number of free disks after removing the plot
+      get_free_disks
+
+      # If no files with matching plot patterns were found
+      if [ $file_count -eq 0 ]; then
+        echo -e "${CYAN}$(date)${RESET} No plot files with matching patterns were found."
+        no_matching_plots_found=true
+      fi
+    done
   else
-    echo "removing $oldest_file"
-    chattr -i "$oldest_file"
-    rm_output=$(rm -v "$oldest_file" 2>&1)
-    echo "$rm_output"
-    
-    if [ -n "$logfile" ]; then
-      echo "$(date) - ${rm_output}" >> "$logfile"
-    fi
+    echo "${CYAN}$(date)${RESET} There are enough free disks. No need to remove plot files."
   fi
+}
+
+validate_arguments
+find_disks
+
+while true; do
+  clear
   echo
-  plot_found=true
-fi
-
-      if [ "$plot_found" == true ]; then
-        sleep 4
-        break
-      fi
-    done
-
-    free_disks=()
-
-    for disk in "${disks[@]}"; do
-      free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
-      if [ "$free_space" -ge "$min_free_space_bytes" ]; then
-        free_disks+=("$disk")
-      fi
-    done
-done
-  echo -e "${CYAN}$(date)${RESET}"
-
-  if [ "${#free_disks[@]}" -ge "$amount_free_disks" ]; then
-    echo -e "${CYAN}$amount_free_disks${RESET} drives with each ${CYAN}$min_free_space${RESET} GB free space found."
-  elif [ "$plot_found" == false ]; then
-    echo -e "No plots with Plot Compression level ${CYAN}$replot_levels${RESET} found."
-  fi
-  echo "No more plots need to be removed for now."
-  sleep $interval
+  display_info
+  display_free_disks_info
+  process_plot_files
+  echo -e "${CYAN}$(date)${RESET} Waiting $interval seconds"
+  sleep "$interval"
 done
