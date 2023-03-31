@@ -232,8 +232,8 @@ display_help() {
     echo "  --help                    : Show this help text"
     echo "  --wipe                    : Wipe the specified drives"
     echo "  --format                  : Format the specified drives (requires --fstype)"
-    echo "  --label                   : Label the specified drives (requires --fstype and --label-prefix)"
-    echo "  --init                    : Wipe, format, and label the specified drives (requires --fstype and --label-prefix)"
+    echo "  --label                   : Label the specified drives (fstype is auto-detected)"
+    echo "  --init                    : Wipe, format, and label the specified drives (requires --fstype)"
     echo "  --fstype [xfs|ext4|ntfs]  : Specify the filesystem type"
     echo "  --label-prefix PREFIX     : Specify a custom prefix for the drive labels (default: CHIA)"
     echo ""
@@ -301,7 +301,7 @@ execute_action() {
             echo -e ""
             format $drive &
             pid=$!
-            #spinner $pid
+            spinner $pid
             wait $pid
             ;;
         --label)
@@ -384,8 +384,8 @@ summarize_actions
 
 # Check for and confirm destructive actions
 if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; then
-    #confirm_destructive_action "${DRIVES[@]}"
-    echo ""
+    confirm_destructive_action "${DRIVES[@]}"
+    #echo ""
 fi
 
 # Iterate through the provided arguments and call the corresponding functions based on the action
