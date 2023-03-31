@@ -27,17 +27,23 @@ Options
 --help: Show help text
 --wipe: Wipe the specified drives
 --format: Format the specified drives (requires --fstype)
---label: Label the specified drives (requires --fstype and --label-prefix)
+--label: Label the specified drives
 --init: Wipe, format, and label the specified drives (requires --fstype and --label-prefix)
 --fstype [xfs|ext4|ntfs]: Specify the filesystem type
 --label-prefix PREFIX: Specify a custom prefix for the drive labels (default: CHIA)
 </pre>
 
 ## Example
+
+Wipe, format (ext4) and label the given drives using the label Pattern CHIA-[SERIALNR]
 ```bash
 ./chiainit --fstype ext4 --init sdx sdy sdz sdaa sdab
 ```
-This command will wipe, format (ext4) and label the given drives using the label Pattern CHIA-[SERIALNR]
+
+Label drives sdx sdy sdz sdaa sdab with the pattern GIGA-[SERIALNR] (FSTYPE is auto-detected)
+```bash
+./chiainit --label --label-prefix GIGA sdx sdy sdz sdaa sdab
+```
 
 ## Warning
 
