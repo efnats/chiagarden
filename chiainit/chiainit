@@ -32,24 +32,13 @@ get_serial_number() {
 }
 
 
-# Function to get the label of a drive
-get_label() {
+# Function to get the filesystem type of a drive
+get_fs_type() {
     partition=$1
-    readlabel=""
-
-    case "$FSTYPE" in
-        xfs)
-            readlabel=$(sudo xfs_admin -l /dev/$partition 2>/dev/null | awk '{print $3}')
-            ;;
-        ext4)
-            readlabel=$(sudo e2label /dev/$partition 2>/dev/null)
-            ;;
-        ntfs)
-            readlabel=$(sudo ntfslabel /dev/$partition 2>/dev/null)
-            ;;
-    esac
-    echo "$readlabel"
+    fs_type=$(sudo blkid -o value -s TYPE /dev/$partition)
+    echo "$fs_type"
 }
+
 
 # Confirm destructive actions
 confirm_destructive_action() {
@@ -108,14 +97,15 @@ summarize_actions() {
 
 
 
-# Function to label a drive
+## Function to label a drive (updated)
 label() {
     drive=$1
     partition=$2
     serial_number=$(get_serial_number "$drive")
     label="${SERIALPREFIX}-${serial_number}"
-    
-    case "$FSTYPE" in
+    fs_type=$(get_fs_type "$partition")
+
+    case "$fs_type" in
         xfs)
             label=$(echo "$label" | cut -c 1-12)
             sudo xfs_admin -L "$label" /dev/$partition > /dev/null 2>&1
@@ -130,6 +120,29 @@ label() {
             ;;
     esac
 }
+
+
+
+# Function to get the label of a drive
+get_label() {
+    partition=$1
+    readlabel=""
+    fs_type=$(get_fs_type "$partition")
+
+    case "$fs_type" in
+        xfs)
+            readlabel=$(sudo xfs_admin -l /dev/$partition 2>/dev/null | awk '{print $3}')
+            ;;
+        ntfs)
+            readlabel=$(sudo ntfslabel /dev/$partition 2>/dev/null)
+            ;;
+        ext4)
+            readlabel=$(sudo e2label /dev/$partition 2>/dev/null)
+            ;;
+    esac
+    echo "$readlabel"
+}
+
 
 # Function to wipe a drive
 wipe() {
@@ -294,8 +307,9 @@ execute_action() {
         --label)
             echo -ne "  ${YELLOW}Labeling /dev/${drive}1...${RESET}"
             echo -e ""
-            label $drive "${drive}1"
-            drive_label=$(get_label "${drive}1")
+            partition="${drive}1"
+            label $drive "$partition"
+            drive_label=$(get_label "$partition")
             echo -e "  ${CYAN}New label: ${RESET}${drive_label}"
             pid=$!
             #spinner $pid
@@ -343,7 +357,7 @@ done
 
 # Check for valid FSystem entry
 function check_fstype_issued() {
-if { [ "$ACTION" == "--format" ] || [ "$ACTION" == "--label" ] || [ "$ACTION" == "--init" ]; } && [ -z "$FSTYPE" ]; then
+if { [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; } && [ -z "$FSTYPE" ]; then
     echo "Error: Missing filesystem type for format or label action."
     display_usage
     exit 1
@@ -362,12 +376,16 @@ fi
 
 check_fstype_issued
 check_drives_exist
-check_drives_mounted
+# Check if action is not label before checking if drives are mounted
+if [ "$ACTION" != "--label" ]; then
+    check_drives_mounted
+fi
 summarize_actions
 
 # Check for and confirm destructive actions
 if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; then
-    confirm_destructive_action "${DRIVES[@]}"
+    #confirm_destructive_action "${DRIVES[@]}"
+    echo ""
 fi
 
 # Iterate through the provided arguments and call the corresponding functions based on the action
