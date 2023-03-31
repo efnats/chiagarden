@@ -32,6 +32,18 @@ get_serial_number() {
 }
 
 
+# Function to retrieve the UUID of a partition
+get_uuid() {
+    partition=$1
+    uuid=$(sudo blkid -o value -s UUID /dev/$partition)
+    if [ -z "$uuid" ]; then
+        echo "UNKNOWN"
+    else
+        echo "$uuid"
+    fi
+}
+
+
 # Function to get the filesystem type of a drive
 get_fs_type() {
     partition=$1
@@ -97,30 +109,39 @@ summarize_actions() {
 
 
 
-## Function to label a drive (updated)
+# Function to label a drive
 label() {
     drive=$1
     partition=$2
     serial_number=$(get_serial_number "$drive")
+    uuid=$(get_uuid "$partition")
+    echo "  Serial Number: $serial_number"
+    echo "  UUID: $uuid"
+    
+    if [ "$serial_number" == "UNKNOWN" ]; then
+        serial_number=$uuid
+    fi
     label="${SERIALPREFIX}-${serial_number}"
-    fs_type=$(get_fs_type "$partition")
+    FSTYPE=$(get_fs_type "$partition")
 
-    case "$fs_type" in
+    case "$FSTYPE" in
         xfs)
             label=$(echo "$label" | cut -c 1-12)
-            sudo xfs_admin -L "$label" /dev/$partition > /dev/null 2>&1
+            echo "  setting filesystem: xfs"
+            sudo xfs_admin -L "$label" /dev/$partition
             ;;
         ext4)
             label=$(echo "$label" | cut -c 1-16)
-            sudo e2label /dev/$partition "$label" > /dev/null 2>&1
+            echo "  setting filesystem: ext4"
+            sudo e2label /dev/$partition "$label"
             ;;
         ntfs)
             label=$(echo "$label" | cut -c 1-32)
-            sudo ntfslabel /dev/$partition "$label" > /dev/null 2>&1
+            echo "  setting filesystem: ntfs"
+            sudo ntfslabel /dev/$partition "$label"
             ;;
     esac
 }
-
 
 
 # Function to get the label of a drive
