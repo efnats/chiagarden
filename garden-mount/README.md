@@ -57,6 +57,7 @@ The `mnt-chia-drives.service` is a systemd service that is responsible for autom
 Copy the systemd services to their directories and start/enable the service
 ```bash
 sudo cp mnt-chia-drives.service /etc/systemd/system/
+sudo cp chiamount /usr/local/bin/
 sudo systemctl daemon-reload
 sudo systemctl start mnt-chia.drives.service
 sudo systemctl enable mnt-chia.drives.service
