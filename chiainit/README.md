@@ -28,7 +28,7 @@ Options
 --wipe: Wipe the specified drives
 --format: Format the specified drives (requires --fstype)
 --label: Label the specified drives
---init: Wipe, format, and label the specified drives (requires --fstype and --label-prefix)
+--init: Wipe, format, and label the specified drives (requires --fstype)
 --fstype [xfs|ext4|ntfs]: Specify the filesystem type
 --label-prefix PREFIX: Specify a custom prefix for the drive labels (default: CHIA)
 </pre>
