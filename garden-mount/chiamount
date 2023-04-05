@@ -16,7 +16,7 @@ help() {
     echo "  --unmount            Unmount devices with the specified label prefix. Unmount the MergerFS mountpoint if it exists."
     echo "  --label PREFIX       Specify the label prefix of the devices to mount/unmount (default: 'CHIA')."
     echo "  --read-only          Mount devices as read-only."
-    echo "  --mount-point PATH   Specify the mount point base directory (default: '/media/username')."
+    echo "  --mount-point [PATH] Specify the mount point base directory (default: '/media/username')."
     echo "  --mergerfs [PATH]    Use MergerFS to combine the mounted devices into a single drive-like filesystem. (default: '/mnt/garden')"
     echo "  --help               Display this help message and exit."
     echo
