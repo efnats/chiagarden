@@ -1,6 +1,6 @@
 # plot_counter - Display amount of plots for each C-level
 
-`plot_counter`: A script that counts Chia plots on multiple disks and calculates their total size in TiB (tebibytes). The script will scan mounted disks at a specified interval and display the count and size of plots found for each compression level. The results are displayed in a table format in the terminal.
+`plot_counter`: A script that counts Chia plots on multiple disks and calculates their total size in TiB (tebibytes). The script will scan mounted disks at a specified interval and display the count and size of plots found for each compression level. It will also display how many plots and data has been written to the identified disks in a given time. The results are displayed in a table format in the terminal.
 
 ## Usage
 
