@@ -44,7 +44,7 @@ The script has the following command-line options:
 ./chiamount --unmount
 ```
 
-# garden-mount systemd services
+# Systemd service
 
 The `chiamount` command will output all required fstab entry lines for your CHIA disks and for combining all disks into a Union Filesystem in MergerFS. To make all your mount points persisent you can simply copy this output and paste it into your /etc/fstab. HOWEVER, if you are running a linux distribution that supports `systemd` like Debian or Ubuntu, you may consider using the provided systemd service files instead. Those will enable you to finetune your dependencies. For example you may want to make sure that your mounts are set before your docker.service is run. If you decide to use systemd you probably know how to modify these according to your needs.
 
