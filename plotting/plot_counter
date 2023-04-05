@@ -98,6 +98,42 @@ stop_spinner() {
 }
 
 
+count_written_data_in_period() {
+    local period_in_seconds=$1
+    local current_time=$(date +%s)
+    local period_start=$((current_time - period_in_seconds))
+    local total_size=0
+
+    for disk in $(find_chia_disks)
+    do
+        if [ -d "$disk" ]; then
+            size=$(find "$disk" -maxdepth "$maxdepth" -name '*.plot' -type f -printf '%T@ %s\n' | awk -v period_start="$period_start" '$1 > period_start {s+=$2} END {print s/1024/1024/1024/1024}')
+            total_size=$(awk -v total_size="$total_size" -v new_size="$size" 'BEGIN {print total_size+new_size}')
+        fi
+    done
+
+    echo "$(printf '%.2f' "$total_size")"
+}
+
+count_plot_files_in_period() {
+    local period_in_seconds=$1
+    local current_time=$(date +%s)
+    local period_start=$((current_time - period_in_seconds))
+    local total_count=0
+
+    for disk in $(find_chia_disks)
+    do
+        if [ -d "$disk" ]; then
+            count=$(find "$disk" -maxdepth "$maxdepth" -name '*.plot' -type f -printf '%T@ %s\n' | awk -v period_start="$period_start" '$1 > period_start {count++} END {print count}')
+            total_count=$((total_count + count))
+        fi
+    done
+
+    echo "$total_count"
+}
+
+
+
 # Loop indefinitely
 while true
 do
@@ -172,9 +208,10 @@ done
 # Stop the spinner
 stop_spinner
 
+echo -e "${GREEN}Plots distribution${RESET}"
 # Print the table header
 printf "%-5s %12s %12s\n" "Plot" "Count" "TiB"
-printf "==================================\n"
+printf "===============================\n"
 
 # Print the total counts and sizes for each C-part pattern
 total_plots=0
@@ -194,8 +231,44 @@ do
 done
 
 # Print the total number of plots and size in TiB
-printf "=================================\n"
+printf "===============================\n"
 printf "%-5s %12s %12s\n" "Total" "$total_plots" "$(printf '%.2f' "$total_size")"
+
+
+
+# Call the count_plot_files_in_period and count_written_data_in_period functions
+plot_files_last_minute=$(count_plot_files_in_period 60)
+written_data_last_minute=$(count_written_data_in_period 60)
+
+plot_files_last_hour=$(count_plot_files_in_period 3600)
+written_data_last_hour=$(count_written_data_in_period 3600)
+
+plot_files_last_day=$(count_plot_files_in_period $((24 * 3600)))
+written_data_last_day=$(count_written_data_in_period $((24 * 3600)))
+
+plot_files_last_week=$(count_plot_files_in_period $((7 * 24 * 3600)))
+written_data_last_week=$(count_written_data_in_period $((7 * 24 * 3600)))
+
+plot_files_last_month=$(count_plot_files_in_period $((4 * 7 * 24 * 3600)))
+written_data_last_month=$(count_written_data_in_period $((4 * 7 * 24 * 3600)))
+
+# Print the table header
+echo
+echo
+echo -e "${GREEN}Data written${RESET}"
+printf "%-5s %11s %12s\n" "Period" "Plots" "TiB"
+printf "===============================\n"
+
+# Print the number of plot files and the amount of data written for each time period
+printf "Minute %11s %12s\n" "$plot_files_last_minute" "$written_data_last_minute"
+printf "Hour   %11s %12s\n" "$plot_files_last_hour" "$written_data_last_hour"
+printf "Day    %11s %12s\n" "$plot_files_last_day" "$written_data_last_day"
+printf "Week   %11s %12s\n" "$plot_files_last_week" "$written_data_last_week"
+printf "Month  %11s %12s\n" "$plot_files_last_month" "$written_data_last_month"
+
+
+
+
 
 # Sleep for the specified interval before repeating the loop
     echo
