@@ -2,7 +2,7 @@
 
 subdir=""
 default_command=echo
-#default_command="/usr/local/bin/chia_plot_sink --/
+#default_command="/usr/local/bin/chia_plot_sink --"
 
 # Add color variables and bold
 GREEN="\033[32m"
@@ -82,4 +82,4 @@ if [ "$format" == "newline" ]; then
 fi
 
 # Run the default command with the destination directory $dest_disks
-$default_command0 $dest_disks
+$default_command $dest_disks
