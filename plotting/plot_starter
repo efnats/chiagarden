@@ -11,7 +11,7 @@ contract="pool_contract_address"
 plotamount=-1
 compression=5
 
-plotting_dir="/mnt/plotting/" # your temporary plotting dir (-t in cuda_plot_k32)
+plotting_dir="/mnt/plotting" # your temporary plotting dir (-t in cuda_plot_k32)
 dest_dir=192.168.31.33 # set to a destination dir or a host where plotsink is running
 
 plotterbin="/usr/local/bin/cuda_plot_k32"
