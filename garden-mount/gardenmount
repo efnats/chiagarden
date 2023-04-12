@@ -140,6 +140,11 @@ elif [ "$action" == "unmount" ]; then
             read -r mounted_device mounted_path <<<"$mount_info"
             umount -v "$mounted_device"
             found_disks=1
+
+            # Check if the directory is empty and remove it
+            if [ -d "$mounted_path" ] && [ -z "$(ls -A "$mounted_path")" ]; then
+                rmdir "$mounted_path"
+            fi
         fi
     done < <(find /dev/disk/by-label -name "$label_pattern")
 else
