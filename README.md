@@ -27,13 +27,18 @@ As long as your disks are mounted to the same mountpoint exclusively, there is a
 
 ## Getting Started
 
-To get started with ChiaGarden, clone the repository, and follow the instructions in each directory for setting up and configuring your Chia farm.
+To get started with ChiaGarden, clone the repository, and run the installer script install.sh.
 
 ```bash
 git clone https://github.com/efnats/chiagarden.git
 cd chiagarden
+sudo ./install.sh
 ```
+The installer script will guide you through the installation process, copy necessary files, and optionally enable and start the garden-mount.service.
 
+Once you have installed ChiaGarden, use it to ensure all drives containing plot files are labeled with a unique label pattern (default: CHIA-[serialnr]). The chiainit tool can be used to (re)label available drives in your system. Relabeling a drive is a non-destructive action and will not delete any data on the drive.
+
+Refer to the instructions in each directory for further configuration and usage information.
 ## Contributing
 Contributions to ChiaGarden are welcome. Feel free to submit pull requests or open issues to improve the tools and make them more useful for the Chia farming community.
 

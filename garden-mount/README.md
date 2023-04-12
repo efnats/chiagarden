@@ -12,8 +12,8 @@ When mounting drives, the script will print all mount entries with their corresp
 
 The script has the following command-line options:
 
-- `--mount`: Mounts the drives with the specified label prefix
-- `--unmount`: Unmounts the drives with the specified label prefix
+- `--mount`: Mounts all drives that have the specified label prefix
+- `--unmount`: Unmounts all drives that have the specified label prefix
 - `--label LABEL_PREFIX`: Specifies the label prefix to use for matching drives (default: CHIA)
 - `--read-only`: Mounts the drives as read-only (only applicable with `--mount`)
 - `--mount-point [PATH]`: Mounts the drives into thes specified mountpoint (default: /media/[username])
