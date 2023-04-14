@@ -122,6 +122,10 @@ update_env_file() {
     local xch_plots_dir=$(generate_xch_plots_dir)
     local gigahorse_plots_dir=$(generate_gigahorse_plots_dir)
     local compose_file=$(generate_compose_file_list)
+    local hostname_entry="hostname=$(hostname)"
+    local dockerdir_entry="dockerdir=$dockerdir"
+    local timezone_entry="timezone=$(cat /etc/timezone)"
+    local local_ip_entry="lanip=$(hostname -I | awk '{print $1}')"
     
     if grep -q "xch_plots_dir=" "$env_file"; then
         sed -i "s|xch_plots_dir=.*|${xch_plots_dir}|" "$env_file"
@@ -138,7 +142,31 @@ update_env_file() {
     else
         echo "$compose_file" >> "$env_file"
     fi
+    if grep -q "hostname=" "$env_file"; then
+        sed -i "s|hostname=.*|${hostname_entry}|" "$env_file"
+    else
+        echo "$hostname_entry" >> "$env_file"
+    fi
+    if grep -q "dockerdir=" "$env_file"; then
+        sed -i "s|dockerdir=.*|${dockerdir_entry}|" "$env_file"
+    else
+        echo "$dockerdir_entry" >> "$env_file"
+    fi
+    if grep -q "timezone=" "$env_file"; then
+        sed -i "s|timezone=.*|${timezone_entry}|" "$env_file"
+    else
+        echo "$timezone_entry" >> "$env_file"
+    fi
+    if grep -q "lanip=" "$env_file"; then
+        sed -i "s|lanip=.*|${local_ip_entry}|" "$env_file"
+    else
+        echo "$local_ip_entry" >> "$env_file"
+    fi
 }
+
+
+
+
 
 
 # Function to populate the docker-compose.yml file with the found devices list
@@ -172,7 +200,7 @@ update_docker_compose_file() {
 update_env_file
 update_docker_compose_file
 #echo ""
-#cat $env_file
-#echo ""
-#echo ""
+cat $env_file
+echo ""
+echo ""
 #cat $docker_compose_file
