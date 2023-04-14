@@ -25,6 +25,10 @@ As long as your disks are mounted to the same mountpoint exclusively, there is a
 
 [taco_list](https://github.com/efnats/chiagarden/tree/main/taco_list) is a simple wrapper script to list your destination disks and execute any command with the given parameters - for example chia_plot_sink
 
+## machinaris
+
+[machinaris](https://github.com/efnats/chiagarden/tree/main/machinaris) this folder contains script(s) that help with the setup and installation of [Machinaris](https://www.machinaris.app/), specifically with the docker-compose setup. This part is currently mostly work in progress
+
 ## Getting Started
 
 To get started with ChiaGarden, clone the repository, and run the installer script install.sh.

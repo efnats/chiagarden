@@ -1,7 +1,7 @@
 #!/bin/bash
 
+# Variables
 subdir=""
-default_command=echo
 dockerdir=/home/chia/docker
 env_file=$dockerdir/.env
 docker_compose_file="node_chia.yml"
@@ -9,6 +9,7 @@ xch_plots_subdir="/chia"
 gigahorse_plots_subdir="/gigahorse"
 
 
+# Color codes for text output
 GREEN="\033[32m"
 YELLOW="\033[33m"
 CYAN="\033[36m"
@@ -16,13 +17,17 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
+
+# Function to print the script's usage instructions
 print_usage() {
     echo  "Usage:"
-    echo "./taco_list --mount-dir /path/to/dir [--subdir subdir_name]"
+    echo "./composerize --mount-dir /path/to/dir [--subdir subdir_name]"
     echo "or"
-    echo "./taco_list --label CHIA [--subdir subdir_name]"
+    echo "./composerize --label CHIA [--subdir subdir_name]"
 }
 
+
+# Parse command line arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --mount-dir)
@@ -45,6 +50,8 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
+
+# Check if both --mount-dir and --label are missing or both are provided, and print usage instructions accordingly
 if [ -z "$mount_dir" ] && [ -z "$label" ]; then
     print_usage
     exit 1
@@ -57,6 +64,7 @@ if [ -n "$mount_dir" ] && [ -n "$label" ]; then
 fi
 
 
+# Find destination disks and directories based on input arguments
 if [ -n "$mount_dir" ]; then
     dest_disks=$(find "$mount_dir" -mindepth 1 -maxdepth 1 -type d -exec findmnt --noheadings --output SOURCE --mountpoint {} \; | sort | uniq | tr '\n' ' ')
     dest_dirs=$(find "$mount_dir" -mindepth 1 -maxdepth 1 -type d | sed "s|$|/$subdir|" | tr '\n' ' ')
@@ -66,7 +74,7 @@ elif [ -n "$label" ]; then
 fi
 
 
-
+# Function to generate a list of devices for the Docker Compose file
 generate_devices_list() {
     local devices_list=""
     for device in $dest_disks; do
@@ -77,7 +85,7 @@ generate_devices_list() {
 }
 
 
-
+# Function to generate a list of Chia plots directories for the .env file
 generate_xch_plots_dir() {
     local xch_plots_dir=""
     IFS=' ' read -ra ADDR <<< "$dest_dirs"
@@ -88,6 +96,8 @@ generate_xch_plots_dir() {
     echo "xch_plots_dir=$xch_plots_dir"
 }
 
+
+# Function to generate a list of Gigahorse plots directories for the .env file
 generate_gigahorse_plots_dir() {
     local gigahorse_plots_dir=""
     IFS=' ' read -ra ADDR <<< "$dest_dirs"
@@ -98,17 +108,20 @@ generate_gigahorse_plots_dir() {
     echo "gigahorse_plots_dir=$gigahorse_plots_dir"
 }
 
-generate_compose_file() {
+
+# Function to generate a list of Docker Compose files for the .env file
+generate_compose_file_list() {
     compose_list=$(ls -1 $dockerdir/*.yml | while read -r line; do printf '%s\n' "$line"; done)
     compose=$(paste -s -d ':' <<<"$compose_list")
     echo "COMPOSE_FILE=$compose"
 }
 
 
+# Function to update the .env file with new values
 update_env_file() {
     local xch_plots_dir=$(generate_xch_plots_dir)
     local gigahorse_plots_dir=$(generate_gigahorse_plots_dir)
-    local compose_file=$(generate_compose_file)
+    local compose_file=$(generate_compose_file_list)
     
     if grep -q "xch_plots_dir=" "$env_file"; then
         sed -i "s|xch_plots_dir=.*|${xch_plots_dir}|" "$env_file"
@@ -128,6 +141,7 @@ update_env_file() {
 }
 
 
+# Function to populate the docker-compose.yml file with the found devices list
 update_docker_compose_file() {
     local devices_list=$(generate_devices_list)
     local devices_section_start=$(grep -n -E "^[[:space:]]*devices:" "$docker_compose_file" | cut -d ':' -f 1)
@@ -157,8 +171,8 @@ update_docker_compose_file() {
 #generate_devices_list
 update_env_file
 update_docker_compose_file
-echo ""
-cat $env_file
-echo ""
-echo ""
-cat $docker_compose_file
+#echo ""
+#cat $env_file
+#echo ""
+#echo ""
+#cat $docker_compose_file
