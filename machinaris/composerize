@@ -119,6 +119,12 @@ generate_compose_file_list() {
 
 # Function to update the .env file with new values
 update_env_file() {
+    
+    # Check if the .env file exists, and create it if it doesn't
+    if [ ! -f "$env_file" ]; then
+        touch "$env_file"
+    fi
+
     local xch_plots_dir=$(generate_xch_plots_dir)
     local gigahorse_plots_dir=$(generate_gigahorse_plots_dir)
     local compose_file=$(generate_compose_file_list)
