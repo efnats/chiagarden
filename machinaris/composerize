@@ -4,7 +4,7 @@
 subdir=""
 dockerdir=/home/chia/docker
 env_file=$dockerdir/.env
-docker_compose_file="node_chia.yml"
+docker_compose_file=$dockerdir/node_chia.yml
 xch_plots_subdir="/chia"
 gigahorse_plots_subdir="/gigahorse"
 
