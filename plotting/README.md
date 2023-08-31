@@ -37,7 +37,10 @@ count all plots from all disks labelled beginning with the pattern GIGA (no matt
 
 # plot_mover - A simple and user-friendly plot moving script
 
-`plot_mover` is a Bash script that monitors a specified source directory for new Chia plot files and moves them to a specified destination directory using `rsync`.
+`plot_mover` is a Bash script that monitors a specified source directory for new Chia plot files and moves them to a specified destination directory using `rsync`. `plot_mover` is a rather simple script that will currently handle only one file at a time. If a new plot arrives in the `watch_dir` it isn't processed until the current copy process is finished. Hence, this tool won't take advantage of expanding transfer bandwith by using multiple target hard drives.
+That's why I would recommend to use the in-built `-d, --finaldir` argument of the cuda plotter to handle moving of plots. There are two ways to achieve bandwith optimized moving plots:
+- use `plot-sink` and specify a remote or local host IP (current default of `plot_starter`)
+- use the mergerfs `/mnt/garden` as a destination directory. The specified write policy `mfs (most free space)` will always pick a new drive as long as the drives offer equally free space.
 
 ## Prerequisites
 
