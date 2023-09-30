@@ -21,12 +21,12 @@ fi
 echo -e "${GREEN}ChiaGarden Installer${NC}"
 echo "----------------------------------"
 
-# Prompt user for confirmation
-read -p "This script will install ChiaGarden and its dependencies. Do you want to proceed? [y/N] " response
-if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+read -p "This script will install ChiaGarden and its dependencies. Do you want to proceed? [Y/n] " response
+if [[ "$response" =~ ^([nN][oO]|[nN])$ ]]; then
   echo -e "${RED}Installation canceled.${NC}"
   exit 1
 fi
+
 
 # Update package list and install dependencies
 echo -e "\n${YELLOW}Updating package list and installing dependencies...${NC}"
@@ -57,7 +57,7 @@ done
 
 # Copy the systemd service
 if [[ -e "gardenmount/garden-mount.service" ]]; then
-  echo -e "\n${YELLOW}Copying the garden-mount.service file...${NC}"
+  echo -e "\n${YELLOW}Installing garden-mount.service${NC}"
   cp ./gardenmount/garden-mount.service /etc/systemd/system/
 else
   echo -e "${RED}Error: garden-mount.service not found${NC}"
@@ -65,19 +65,20 @@ else
 fi
 
 # Prompt user to enable the systemd service
-echo -e "\n${YELLOW}The garden-mount.service manages your drive mounts and mergerfs. More info in the readme files.${NC}"
-read -p "Do you want to automatically start the garden-mount.service upon boot? [y/N] " enable_response
-if [[ "$enable_response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-  echo -e "\n${GREEN}Enabling the garden-mount service...${NC}"
+#echo -e "\n${YELLOW}The garden-mount.service manages is for automounting during boot.${NC}"
+read -p "Do you want to enable the garden-mount service? This will automount your drives on boot? [Y/n] " enable_response
+if [[ ! "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
+  echo -e "\n${YELLOW}Enabling the garden-mount service...${NC}"
   systemctl daemon-reload
   systemctl enable garden-mount.service
 fi
 
-# Prompt user to start the systemd service
-read -p "Do you want to start the garden-mount systemd service now? [y/N] " start_response
-if [[ "$start_response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-  echo -e "\n${GREEN}Starting the garden-mount service...${NC}"
-  systemctl start garden-mount.service
-fi
+echo -e
+echo -e "${BOLD}${GREEN}ChiaGarden installation complete!${NC}"
+echo -e "Please read the README.md files for more information on how to use ChiaGarden.\n"
+echo -e "${YELLOW}You may want to start by using chiainit to initialize your drives.${NC}\n"
 
-echo -e "\n${GREEN}ChiaGarden installation complete!${NC}\n"
+/usr/local/bin/chiainit --help
+echo
+
+
