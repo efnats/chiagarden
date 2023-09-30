@@ -31,6 +31,8 @@ Options
 --init: Wipe, format, and label the specified drives (requires --fstype)
 --fstype [xfs|ext4|ntfs]: Specify the filesystem type
 --label-prefix PREFIX: Specify a custom prefix for the drive labels (default: CHIA)
+--all: Operate on all spinning drives (excluding system drive and mounted drives)
+--exclude [drive1 drive2]: Exclude the specified drives from the operation
 </pre>
 
 ## Example
@@ -38,6 +40,11 @@ Options
 Wipe, format (ext4) and label the given drives using the label Pattern CHIA-[SERIALNR]
 ```bash
 ./chiainit --fstype ext4 --init sdx sdy sdz sdaa sdab
+```
+
+Wipe, format (ext4) and label all spinning drives using the label Pattern CHIA-[SERIALNR], exclude sdg sdh and sdi
+```bash
+./chiainit --fstype ext4 --init --all --exclude sdg sdh sdi
 ```
 
 Label drives sdx sdy sdz sdaa sdab with the pattern GIGA-[SERIALNR] (FSTYPE is auto-detected)

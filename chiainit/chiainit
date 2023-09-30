@@ -16,7 +16,7 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
-VERSION="V2"
+VERSION="V2.1"
 ACTION=""
 FSTYPE=""
 
@@ -70,28 +70,23 @@ confirm_destructive_action() {
 }
 
 
-
-## Summarize actions
 summarize_actions() {
-    affected_drives=""
     ntfs_warning=false
+    echo
+    echo -e ${BOLD}"Operation Summary"${RESET}
+    echo -e "Drives     : ${BOLD}${DRIVES[@]}${RESET}"
+    echo -e "Excluded   : ${BOLD}${EXCLUDED_LIST[@]}${RESET}"
+    echo -e "Filesystem : ${BOLD}$FSTYPE${RESET}"
+    echo -e "Actions    : ${BOLD}${ACTION#--}${RESET}"
+    echo
+
+    # Check if any of the drives have the ntfs filesystem and display a warning
     for drive in "${DRIVES[@]}"; do
-        if is_system_drive "$drive"; then
-            echo -e "${YELLOW}Skipping /dev/$drive (system drive).${RESET}"
-        else
-            affected_drives+="$drive, "
-            if [ "$FSTYPE" == "ntfs" ]; then
-                ntfs_warning=true
-            fi
+        if [ "$FSTYPE" == "ntfs" ]; then
+            ntfs_warning=true
+            break
         fi
     done
-    affected_drives=${affected_drives%, }
-
-    #echo "The following actions will be performed:"
-    echo -e "Drives  : ${BOLD}$affected_drives${RESET}"
-    echo -e "Actions : ${BOLD}${ACTION#--}${RESET}"
-    echo -e "FSTYPE  : ${BOLD}$FSTYPE${RESET}"
-    echo ""
 
     if [ "$ntfs_warning" = true ]; then
         echo -e "${RED}WARNING!!${RESET}${BOLD} There is a potential risk for data corruption when using NTFS-3G for Windows. DONT USE IT FOR YOUR FARM!!${RESET}"
@@ -105,8 +100,6 @@ summarize_actions() {
         exit 0
     fi
 }
-
-
 
 
 # Function to label a drive
@@ -196,6 +189,7 @@ format() {
     fi
 }    
 
+
 # Function to initialize a drive (wipe, format, and label)
 init() {
     drive=$1
@@ -204,13 +198,21 @@ init() {
     execute_action "--label" $drive
 }
 
-# Function to check if a drive has a root partition
+
+# List all spinning drives in the system using lsblk and exclude ROM drives
+get_drives() {
+    lsblk -d -o name,rota,type | awk '$2 == "1" && $3 != "rom" {print $1}'
+}
+
+
+# Function to check if a drive has a mounted root partition
 is_system_drive() {
     drive=$1
     root_partition=$(df --output=source / | tail -1)
     echo $root_partition | grep -q "^/dev/${drive}[0-9]*"
     return $?
 }
+
 
 # Function to check if each specified drive exists
 check_drives_exist() {
@@ -224,17 +226,21 @@ check_drives_exist() {
 
 
 # Function to check if any of the specified drives are mounted
-check_drives_mounted() {
-    for drive in "${DRIVES[@]}"; do
-        if grep -qs "/dev/${drive}[0-9]*" /proc/mounts; then
-            echo -e "${RED}Error:${RESET} Drive /dev/$drive is mounted. Please unmount it before continuing."
-            exit 1
-        fi
-    done
+is_drive_mounted() {
+    drive=$1
+    grep -qs "/dev/${drive}[0-9]*" /proc/mounts
+    return $?
 }
 
 
-
+# Check if fstype is issued for format or label action
+function check_fstype_issued() {
+if { [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; } && [ -z "$FSTYPE" ]; then
+    echo "Error: Missing filesystem type for format or label action."
+    display_usage
+    exit 1
+fi
+}
 
 
 # Function to display the help text
@@ -257,13 +263,17 @@ display_help() {
     echo "  --init                    : Wipe, format, and label the specified drives (requires --fstype)"
     echo "  --fstype [xfs|ext4|ntfs]  : Specify the filesystem type"
     echo "  --label-prefix PREFIX     : Specify a custom prefix for the drive labels (default: CHIA)"
+    echo "  --all                     : Operate on all drives (excluding system drive and mounted drives)"
+    echo "  --exclude [drive1 drive2] : Exclude the specified drives from the operation"
     echo ""
     echo "Examples:"
     echo "  chiainit --label sdb sdc"
     echo "  chiainit --fstype ext4 --init sdb sdc"
     echo "  chiainit --fstype xfs --format sdb sdc"
     echo "  chiainit --fstype ext4 --label-prefix FARM --label sdb sdc"
+    echo "  chiainit --all --fstype xfs --init"
 }
+
 
 # Display short help text
 display_usage() {
@@ -294,47 +304,29 @@ spinner() {
 }
 
 
-
 # Execute action
 execute_action() {
     action=$1
     drive=$2
-
     case "$action" in
         --init)
-            echo -e ""
-            echo -ne "${BOLD}${CYAN}Drive /dev/$drive:${RESET}"
-            echo -e ""
-            init $drive &
-            pid=$!
-            wait $pid
+            echo -e "\n${BOLD}${CYAN}Drive /dev/$drive:${RESET}"
+            init $drive
             ;;
         --wipe)
-            echo -ne "  ${YELLOW}Wiping /dev/$drive...${RESET}"
-            echo -e ""
-            wipe $drive &
-            pid=$!
-            #spinner $pid
-            wait $pid
+            echo -e "  ${YELLOW}Wiping /dev/$drive...${RESET}"
+            wipe $drive
             ;;
         --format)
-            echo -ne "  ${YELLOW}Formatting /dev/$drive...${RESET}"
-            echo -e ""
-            format $drive &
-            pid=$!
-            spinner $pid
-            wait $pid
+            echo -e "  ${YELLOW}Formatting /dev/$drive...${RESET}"
+            format $drive
             ;;
         --label)
-            echo -ne "  ${YELLOW}Labeling /dev/${drive}1...${RESET}"
-            echo -e ""
+            echo -e "  ${YELLOW}Labeling /dev/${drive}1...${RESET}"
             partition="${drive}1"
             label $drive "$partition"
             drive_label=$(get_label "$partition")
             echo -e "  ${CYAN}New label: ${RESET}${drive_label}"
-            pid=$!
-            #spinner $pid
-            wait $pid
             ;;
     esac
 }
@@ -348,60 +340,63 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --fstype)
-            if [ "$2" == "xfs" ] || [ "$2" == "ext4" ] || [ "$2" == "ntfs" ]; then
-                FSTYPE="$2"
-                shift 2
-            else
-                echo "Error: Unsupported filesystem type."
-                display_usage
-                exit 1
-            fi
+            [[ "$2" =~ ^(xfs|ext4|ntfs)$ ]] && FSTYPE="$2" || { echo "Error: Unsupported filesystem type."; display_usage; exit 1; }
+            shift 2
             ;;
         --label-prefix)
             SERIALPREFIX="$2"
             shift 2
+            ;;
+        --all)
+            mapfile -t DRIVES < <(get_drives)
+            shift
+            ;;
+        --exclude)
+            while [[ "$#" -gt 1 && ! "$2" =~ ^-- ]]; do
+                EXCLUDED_DRIVES+=("$2")
+                shift
+            done
+            shift
             ;;
         --help)
             help
             exit 0
             ;;
         *)
-            if [ -z "$ACTION" ]; then
-                display_usage
-                exit 1
-            fi
+            [ -z "$ACTION" ] && { display_usage; exit 1; }
             DRIVES+=("$1")
             shift
             ;;
     esac
 done
 
-# Check for valid FSystem entry
-function check_fstype_issued() {
-if { [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; } && [ -z "$FSTYPE" ]; then
-    echo "Error: Missing filesystem type for format or label action."
-    display_usage
-    exit 1
-fi
-}
 
+# Initialize an array to store excluded drives
+EXCLUDED_LIST=()
+echo
+# Filter out the system drive, mounted drives, and user-excluded drives
+for i in "${!DRIVES[@]}"; do
+    is_excluded=false
+    if is_system_drive "${DRIVES[$i]}"; then
+        echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${DRIVES[$i]}${RESET} is system drive. Excluding from operation."
+        is_excluded=true
+    elif is_drive_mounted "${DRIVES[$i]}"; then
+        echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${DRIVES[$i]}${RESET} is mounted. Excluding from operation."
+        is_excluded=true
+    elif [[ " ${EXCLUDED_DRIVES[*]} " == *"${DRIVES[$i]}"* ]]; then
+        echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${DRIVES[$i]}${RESET} is manually excluded. Excluding from operation."
+        is_excluded=true
+    fi
 
-# Main
-
-#display_version
-
-if [ -z "$ACTION" ]; then
-    display_help
-    exit 1
-fi
+    if $is_excluded; then
+        EXCLUDED_LIST+=("${DRIVES[$i]}")
+    fi
+done
 
 check_fstype_issued
 check_drives_exist
-# Check if action is not label before checking if drives are mounted
-if [ "$ACTION" != "--label" ]; then
-    check_drives_mounted
-fi
 summarize_actions
+
 
 # Check for and confirm destructive actions
 if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; then
@@ -409,15 +404,11 @@ if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "-
     #echo ""
 fi
 
-# Iterate through the provided arguments and call the corresponding functions based on the action
+
+# Iterate through the provided arguments and execute action
 for drive in "${DRIVES[@]}"; do
-    if is_system_drive "$drive"; then
-        echo -e "${YELLOW}Skipping /dev/$drive (system drive).${RESET}"
-    else
-        execute_action "$ACTION" $drive
-    fi
+    execute_action "$ACTION" $drive
 done
 
-echo ""
-echo "Operation complete for all specified drives."
-echo ""
+
+echo -e "\nOperation complete for all specified drives.\n"
