@@ -37,7 +37,7 @@ apt install -y mergerfs xfsprogs ntfs-3g smartmontools parted
 echo -e "\n${YELLOW}Copying ChiaGarden files...${NC}"
 files_to_copy=(
   "./chiainit/chiainit"
-  "./garden-mount/gardenmount"
+  "./gardenmount/gardenmount"
   "./plotting/plot_counter"
   "./plotting/plot_mover"
   "./plotting/plot_over"
@@ -56,9 +56,9 @@ for file in "${files_to_copy[@]}"; do
 done
 
 # Copy the systemd service
-if [[ -e "garden-mount/garden-mount.service" ]]; then
+if [[ -e "gardenmount/garden-mount.service" ]]; then
   echo -e "\n${YELLOW}Copying the garden-mount.service file...${NC}"
-  cp ./garden-mount/garden-mount.service /etc/systemd/system/
+  cp ./gardenmount/garden-mount.service /etc/systemd/system/
 else
   echo -e "${RED}Error: garden-mount.service not found${NC}"
   exit 1
