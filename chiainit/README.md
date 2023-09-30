@@ -6,11 +6,12 @@ Other tools in this repo rely on drives being labelled in this fashion so they c
 
 ## Features
 
-- Wipe drives
+- Mass sysprep forChia farming
 - Supports XFS, EXT4 and NTFS filesystems
 - Label drives with custom prefixes
 - Lots of safety questions before doing anything
 - System drives (disks where any partition is mounted as /) are never processed
+- Mounted drives are never processed
 
 ## Requirements
 
