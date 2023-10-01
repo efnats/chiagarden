@@ -2,12 +2,6 @@
 
 subdir=""
 default_command=echo
-dockerdir=/home/chia/docker
-env_file=$dockerdir/.env
-docker_compose_file="node_chia.yml"
-xch_plots_subdir="/chia"
-gigahorse_plots_subdir="/gigahorse"
-
 
 GREEN="\033[32m"
 YELLOW="\033[33m"
@@ -18,9 +12,9 @@ RESET="\033[0m"
 
 print_usage() {
     echo  "Usage:"
-    echo "./taco_list --mount-dir /path/to/dir [--subdir subdir_name]"
+    echo "./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--format oneline|newline]"
     echo "or"
-    echo "./taco_list --label CHIA [--subdir subdir_name]"
+    echo "./taco_list --label CHIA [--subdir subdir_name] [--format oneline|newline]"
 }
 
 while [[ "$#" -gt 0 ]]; do
@@ -37,6 +31,10 @@ while [[ "$#" -gt 0 ]]; do
             subdir="$2"
             shift 2
             ;;
+        --format)
+            format="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown argument: $1"
             print_usage
@@ -46,119 +44,42 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if [ -z "$mount_dir" ] && [ -z "$label" ]; then
+    echo -e "${RED}Please provide either --mount-dir or --label.${RESET}"
     print_usage
     exit 1
 fi
 
 if [ -n "$mount_dir" ] && [ -n "$label" ]; then
-    echo "Error: Both --mount-dir and --label cannot be used at the same time."
+    echo -e "${RED}Error: Both --mount-dir and --label cannot be used at the same time.${RESET}"
     print_usage
     exit 1
 fi
 
-
-if [ -n "$mount_dir" ]; then
-    dest_disks=$(find "$mount_dir" -mindepth 1 -maxdepth 1 -type d -exec findmnt --noheadings --output SOURCE --mountpoint {} \; | sort | uniq | tr '\n' ' ')
-    dest_dirs=$(find "$mount_dir" -mindepth 1 -maxdepth 1 -type d | sed "s|$|/$subdir|" | tr '\n' ' ')
-elif [ -n "$label" ]; then
-    dest_disks=$(df -h | grep -E "^/dev/.*$label" | awk '{print $1}' | sort | uniq)
-    dest_dirs=$(df -h | grep -E "^/dev/.*$label" | awk -v s="$subdir" '{print $6"/"s}' ORS=' ')
+if [ -n "$mount_dir" ] && [ ! -d "$mount_dir" ]; then
+    echo -e "${RED}Error: Specified mount directory doesn't exist.${RESET}"
+    exit 1
 fi
 
+if [ "$format" != "newline" ]; then
+    format="oneline"
+fi
 
-
-generate_devices_list() {
-    local devices_list=""
-    for device in $dest_disks; do
-        device_without_partition=$(echo "$device" | sed 's/[0-9]*$//')
-        devices_list+="            - $device_without_partition:$device_without_partition"$'\n'
-    done
-    echo "$devices_list"
-}
-
-
-
-generate_xch_plots_dir() {
-    local xch_plots_dir=""
-    IFS=' ' read -ra ADDR <<< "$dest_dirs"
-    for disk_path in "${ADDR[@]}"; do
-        xch_plots_dir+="/plots/$(basename $disk_path)$xch_plots_subdir:"
-    done
-    xch_plots_dir=${xch_plots_dir%:} # Remove the trailing colon
-    echo "xch_plots_dir=$xch_plots_dir"
-}
-
-generate_gigahorse_plots_dir() {
-    local gigahorse_plots_dir=""
-    IFS=' ' read -ra ADDR <<< "$dest_dirs"
-    for disk_path in "${ADDR[@]}"; do
-        gigahorse_plots_dir+="/plots/$(basename $disk_path)$gigahorse_plots_subdir:"
-    done
-    gigahorse_plots_dir=${gigahorse_plots_dir%:} # Remove the trailing colon
-    echo "gigahorse_plots_dir=$gigahorse_plots_dir"
-}
-
-generate_compose_file() {
-    compose_list=$(ls -1 $dockerdir/*.yml | while read -r line; do printf '%s\n' "$line"; done)
-    compose=$(paste -s -d ':' <<<"$compose_list")
-    echo "COMPOSE_FILE=$compose"
-}
-
-
-update_env_file() {
-    local xch_plots_dir=$(generate_xch_plots_dir)
-    local gigahorse_plots_dir=$(generate_gigahorse_plots_dir)
-    local compose_file=$(generate_compose_file)
-    
-    if grep -q "xch_plots_dir=" "$env_file"; then
-        sed -i "s|xch_plots_dir=.*|${xch_plots_dir}|" "$env_file"
-    else
-        echo "$xch_plots_dir" >> "$env_file"
+if [ -n "$mount_dir" ]; then
+    dest_disks=$(find "$mount_dir" -mindepth 1 -maxdepth 1 -type d | sed "s|$|/$subdir|")
+elif [ -n "$label" ]; then
+    dest_disks=$(df -h | grep -E "^/dev/.*$label" | awk -v s="$subdir" '{print $6"/"s}')
+    if [ -z "$dest_disks" ]; then
+        echo -e "${RED}Error: No disks found with label $label.${RESET}"
+        exit 1
     fi
-    if grep -q "gigahorse_plots_dir=" "$env_file"; then
-        sed -i "s|gigahorse_plots_dir=.*|${gigahorse_plots_dir}|" "$env_file"
-    else
-        echo "$gigahorse_plots_dir" >> "$env_file"
-    fi
-    if grep -q "COMPOSE_FILE=" "$env_file"; then
-        sed -i "s|COMPOSE_FILE=.*|${compose_file}|" "$env_file"
-    else
-        echo "$compose_file" >> "$env_file"
-    fi
-}
+fi
 
+# if [ "$format" == "oneline" ]; then
+#     dest_disks=$(echo $dest_disks | tr '\n' ' ')
+# fi
 
-update_docker_compose_file() {
-    local devices_list=$(generate_devices_list)
-    local devices_section_start=$(grep -n -E "^[[:space:]]*devices:" "$docker_compose_file" | cut -d ':' -f 1)
-    local devices_section_end=$(grep -n -E -m 1 "^[[:space:]]*-(?![[:space:]]*/dev/)" <(tail -n +$((devices_section_start + 1)) "$docker_compose_file") | cut -d ':' -f 1 || echo -n "")
-
-    if [[ -n "$devices_section_start" ]] && [[ -n "$devices_section_end" ]]; then
-        devices_section_end=$((devices_section_start + devices_section_end - 2))
-        sed -i -e "$((devices_section_start + 1)),$((devices_section_end))d" "$docker_compose_file"
-    elif [[ -n "$devices_section_start" ]] && [[ -z "$devices_section_end" ]]; then
-        devices_section_end=$(wc -l < "$docker_compose_file")
-        sed -i -e "$((devices_section_start + 1)),$((devices_section_end))d" "$docker_compose_file"
-    fi
-
-    if [[ -n "$devices_section_start" ]]; then
-        devices_list=$(echo "$devices_list" | sed 's/^[\t][\t] /            /')
-        sed -i -e "${devices_section_start}r /dev/stdin" "$docker_compose_file" <<< "$devices_list"
-    else
-        echo "devices section not found in $docker_compose_file, appending at the end"
-        echo -e "\n        devices:" >> "$docker_compose_file"
-        devices_list=$(echo "$devices_list" | sed 's/^[\t][\t] /          /')
-        echo "$devices_list" >> "$docker_compose_file"
-    fi
-}
-
-
-# Main script
-#generate_devices_list
-update_env_file
-update_docker_compose_file
-echo ""
-cat $env_file
-echo ""
-echo ""
-cat $docker_compose_file
+if [ "$format" == "newline" ]; then
+    echo -e "$dest_disks"
+else
+    $default_command $dest_disks
+fi
