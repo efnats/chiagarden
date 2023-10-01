@@ -5,11 +5,11 @@ A simple wrapper script to list your destination disks and execute any command w
 ## Usage
 
 ```bash
-./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--format oneline|newline]
+./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--format oneline|newline|csv]
 ```
 or
 ```bash
-./taco_list --label CHIA [--subdir subdir_name] [--format oneline|newline]
+./taco_list --label CHIA [--subdir subdir_name] [--format oneline|newline|csv]
 ```
 
 ## Arguments
@@ -17,7 +17,7 @@ or
 - `--mount-dir`: Specify the path to the directory where the disks are mounted.
 - `--label`: Specify the label of the disks to be used (useful when the disks have the same label).
 - `--subdir`: (Optional) Specify a subdirectory inside each disk. Default is an empty string.
-- `--format`: (Optional) Specify the output format for the list of destination directories. Available options are `oneline` (default) and `newline`.
+- `--format`: (Optional) Specify the output format for the list of destination directories. Available options are `newline`(default), `oneline` and `csv`.
 
 ## Example
 
