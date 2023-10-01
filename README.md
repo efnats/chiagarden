@@ -13,9 +13,9 @@ As long as your disks are mounted to the same mountpoint exclusively, there is a
 
 [chiainit](https://github.com/efnats/chiagarden/tree/main/chiainit) is a bash script that helps you prepare and manage hard drives for PoST farming. It automates the process of wiping, formatting, and labeling multiple drives at once, making it easy to set up and maintain your Chia farming storage.
 
-## garden-mount
+## gardenmount
 
-[garden-mount](https://github.com/efnats/chiagarden/tree/main/garden-mount) is a script for (un)mounting drives based on a specified label prefix. Additionally, this repository provides systemd service files for managing the mounting and unmounting process.
+[gardenmount](https://github.com/efnats/chiagarden/tree/main/gardenmount) is a script for (un)mounting drives based on a specified label prefix. Additionally, this repository provides systemd service files for managing the mounting and unmounting process.
 
 ## plotting
 
