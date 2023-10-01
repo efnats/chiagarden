@@ -1,7 +1,7 @@
 #!/bin/bash
 
 subdir=""
-#default_command=echo
+default_command="echo -e"
 
 GREEN="\033[32m"
 YELLOW="\033[33m"
@@ -70,14 +70,14 @@ fi
 
 case $format in
     "oneline")
-        dest_disks=$(echo "$dest_disks" | tr '\n' ' ')
+        dest_disks=$($default_command "$dest_disks" | tr '\n' ' ')
         ;;
     "csv")
-        dest_disks=$(echo "$dest_disks" | tr '\n' ',' | sed 's/,$//')
+        dest_disks=$($default_command "$dest_disks" | tr '\n' ',' | sed 's/,$//')
         ;;
     *)
         # Treat any unrecognized format as newline
         ;;
 esac
 
-echo -e "$dest_disks"
+$default_command "$dest_disks"
