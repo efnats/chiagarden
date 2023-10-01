@@ -162,7 +162,7 @@ get_label() {
 wipe() {
     drive=$1
     sudo wipefs -a /dev/$drive 2>&1
-    sudo dd if=/dev/zero of=/dev/$drive bs=1M count=100
+    #sudo dd if=/dev/zero of=/dev/$drive bs=1M count=100
 }    
 
 # Function to format a drive
