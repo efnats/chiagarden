@@ -100,7 +100,7 @@ if [[ "$enable_response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
   systemctl enable plot-starter.service
 fi
 
-
+echo -e "Plotsink.service starts MadMax's plotsink on default port 1337."
 read -p "Do you want to enable the plotsink service? [Y/n] " enable_response
 if [[ ! "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
   echo -e "\n${YELLOW}Enabling the plotsink service...${NC}"
