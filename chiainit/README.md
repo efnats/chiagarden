@@ -12,6 +12,7 @@ Other tools in this repo rely on drives being labelled in this fashion so they c
 - Lots of safety questions before doing anything
 - System drives (disks where any partition is mounted as /) are never processed
 - Mounted drives are never processed
+- Supports various methods for drive selection (-all, --exclude, drive ranges like sda-sdz)
 
 ## Requirements
 
@@ -21,8 +22,8 @@ Other tools in this repo rely on drives being labelled in this fashion so they c
 
 ## Usage
 <pre>
-Usage: chiainit [OPTIONS] drive1 drive2 ... driveN
-Example: chiainit --fstype ext4 --init sdb sdc
+Usage: chiainit [OPTIONS] [drive-range1] [drive-range2] [...] driveN
+Example: chiainit --fstype ext4 --init sda-sdm sdq-sdx sdz
 
 Options
 --help: Show help text
@@ -40,7 +41,7 @@ Options
 
 Wipe, format (ext4) and label the given drives using the label Pattern CHIA-[SERIALNR]
 ```bash
-./chiainit --fstype ext4 --init sdx sdy sdz sdaa sdab
+./chiainit --fstype ext4 --init sda-sdz
 ```
 
 Wipe, format (ext4) and label all spinning drives using the label Pattern CHIA-[SERIALNR], exclude sdg sdh and sdi
@@ -48,7 +49,7 @@ Wipe, format (ext4) and label all spinning drives using the label Pattern CHIA-[
 ./chiainit --fstype ext4 --init --all --exclude sdg sdh sdi
 ```
 
-Label drives sdx sdy sdz sdaa sdab with the pattern GIGA-[SERIALNR] (FSTYPE is auto-detected)
+Label drives sda-sdz and sdaa-sdah with the pattern GIGA-[SERIALNR] (FSTYPE is auto-detected)
 ```bash
 ./chiainit --label --label-prefix GIGA sdx sdy sdz sdaa sdab
 ```

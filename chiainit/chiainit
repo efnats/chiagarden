@@ -205,6 +205,35 @@ get_drives() {
 }
 
 
+expand_drive_range() {
+    local range="$1"
+
+    # Split the input into prefix, start, and end
+    local prefix="${range%%[a-z]*}"
+    local range_without_prefix="${range#"$prefix"}"
+    local start="${range_without_prefix%-*}"
+    local end="${range##*-}"
+
+    # Extract the last character of the start and end (e.g., "b" from "sdb")
+    local start_char="${start: -1}"
+    local end_char="${end: -1}"
+
+    # Convert the characters into their ASCII values
+    local start_ascii=$(printf '%d\n' "'$start_char")
+    local end_ascii=$(printf '%d\n' "'$end_char")
+
+    # Loop from start to end and print each drive in the range
+    while [[ $start_ascii -le $end_ascii ]]; do
+        echo "${prefix}${start:0:${#start}-1}$(printf \\$(printf '%03o' $start_ascii))"
+        
+        # Increment the ASCII value
+        ((start_ascii++))
+    done
+}
+
+
+
+
 # Function to check if a drive has a mounted root partition
 is_system_drive() {
     drive=$1
@@ -331,6 +360,7 @@ execute_action() {
     esac
 }
 
+declare -a drives=()
 
 # Process the command-line arguments
 while [[ $# -gt 0 ]]; do
@@ -354,7 +384,7 @@ while [[ $# -gt 0 ]]; do
         --exclude)
             while [[ "$#" -gt 1 && ! "$2" =~ ^-- ]]; do
                 EXCLUDED_DRIVES+=("$2")
-                shift
+                shift 2
             done
             shift
             ;;
@@ -364,7 +394,20 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             [ -z "$ACTION" ] && { display_usage; exit 1; }
-            DRIVES+=("$1")
+            # Assume it's either a range or a drive
+            echo "Processing argument: $1" >&2  # Debug line
+            
+            if [[ $1 == *-* ]]; then
+                # It's a range
+                for drive in $(expand_drive_range "$1"); do
+                    echo "Adding drive: $drive to DRIVES array" >&2  # Debug line
+                    DRIVES+=("$drive")
+                done
+            else
+                # It's a single drive
+                echo "Adding single drive: $1 to DRIVES array" >&2  # Debug line
+                DRIVES+=("$1")
+            fi
             shift
             ;;
     esac
@@ -378,7 +421,7 @@ echo
 for i in "${!DRIVES[@]}"; do
     is_excluded=false
     if is_system_drive "${DRIVES[$i]}"; then
-        echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${DRIVES[$i]}${RESET} is system drive. Excluding from operation."
+        echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${DRIVES[$i]}${RESET} is a system drive. Excluding from operation."
         is_excluded=true
     elif is_drive_mounted "${DRIVES[$i]}"; then
         echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${DRIVES[$i]}${RESET} is mounted. Excluding from operation."
@@ -407,8 +450,10 @@ fi
 
 # Iterate through the provided arguments and execute action
 for drive in "${DRIVES[@]}"; do
+    echo "Processing drives: ${DRIVES[*]}" >&2
     execute_action "$ACTION" $drive
 done
 
 
 echo -e "\nOperation complete for all specified drives.\n"
+
