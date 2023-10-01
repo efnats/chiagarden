@@ -1,7 +1,7 @@
 #!/bin/bash
 
 subdir=""
-default_command=echo
+#default_command=echo
 
 GREEN="\033[32m"
 YELLOW="\033[33m"
@@ -11,10 +11,10 @@ BOLD="\033[1m"
 RESET="\033[0m"
 
 print_usage() {
-    echo  "Usage:"
-    echo "./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--format oneline|newline]"
+    echo "Usage:"
+    echo "./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--format oneline|newline|csv]"
     echo "or"
-    echo "./taco_list --label CHIA [--subdir subdir_name] [--format oneline|newline]"
+    echo "./taco_list --label CHIA [--subdir subdir_name] [--format oneline|newline|csv]"
 }
 
 while [[ "$#" -gt 0 ]]; do
@@ -55,14 +55,8 @@ if [ -n "$mount_dir" ] && [ -n "$label" ]; then
     exit 1
 fi
 
-if [ -n "$mount_dir" ] && [ ! -d "$mount_dir" ]; then
-    echo -e "${RED}Error: Specified mount directory doesn't exist.${RESET}"
-    exit 1
-fi
-
-if [ "$format" != "newline" ]; then
-    format="oneline"
-fi
+# Default format to 'newline' if not specified
+[ -z "$format" ] && format="newline"
 
 if [ -n "$mount_dir" ]; then
     dest_disks=$(find "$mount_dir" -mindepth 1 -maxdepth 1 -type d | sed "s|$|/$subdir|")
@@ -74,12 +68,16 @@ elif [ -n "$label" ]; then
     fi
 fi
 
-# if [ "$format" == "oneline" ]; then
-#     dest_disks=$(echo $dest_disks | tr '\n' ' ')
-# fi
+case $format in
+    "oneline")
+        dest_disks=$(echo "$dest_disks" | tr '\n' ' ')
+        ;;
+    "csv")
+        dest_disks=$(echo "$dest_disks" | tr '\n' ',' | sed 's/,$//')
+        ;;
+    *)
+        # Treat any unrecognized format as newline
+        ;;
+esac
 
-if [ "$format" == "newline" ]; then
-    echo -e "$dest_disks"
-else
-    $default_command $dest_disks
-fi
+echo -e "$dest_disks"
