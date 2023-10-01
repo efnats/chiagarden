@@ -1,0 +1,14 @@
+[Unit]
+Description=Start Plotter
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/plot_starter
+#ExecStart=/usr/local/bin/plot_starter --profile default.profile
+
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target
