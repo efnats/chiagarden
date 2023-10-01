@@ -16,7 +16,7 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
-VERSION="V2.2"
+VERSION="V2.1"
 ACTION=""
 FSTYPE=""
 
@@ -315,17 +315,17 @@ display_help() {
     echo ""
     echo "Examples:"
     echo "  chiainit --label sdb sdc"
-    echo "  chiainit --fstype ext4 --init sdb sdc"
-    echo "  chiainit --fstype xfs --format sdb sdc"
-    echo "  chiainit --fstype ext4 --label-prefix FARM --label sdb sdc"
-    echo "  chiainit --all --fstype xfs --init"
+    echo "  chiainit --fstype ext4 --init sda-sdz"
+    echo "  chiainit --fstype xfs --format sda-sdbz --exclude sdf sdg sdh"
+    echo "  chiainit --fstype ext4 --label --label-prefix GH sd sdc"
+    echo "  chiainit --fstype ext4 --init --all --exclude sda sdb sdc"
 }
 
 
 # Display short help text
 display_usage() {
-    echo "Usage: chiainit [OPTIONS] drive1 drive2 ... driveN"
-    echo "Example: chiainit --fstype ext4 --init sdb sdc"
+    echo "Usage: chiainit [OPTIONS] [drive-range1] [drive-range2] ... driveN"
+    echo "Example: chiainit --fstype ext4 --init sda-sdz"
 }
 
 
@@ -401,7 +401,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --exclude)
             while [[ "$#" -gt 1 && ! "$2" =~ ^-- ]]; do
-                echo "Processing exclusion: $2"  # Debug print
+                # echo "Processing exclusion: $2"  # Debug print
                 # Check if it's a range
                 if [[ $2 == *-* ]]; then
                     for drive in $(expand_drive_range "${2%-*}" "${2##*-}"); do
@@ -421,7 +421,7 @@ while [[ $# -gt 0 ]]; do
         *)
             [ -z "$ACTION" ] && { display_usage; exit 1; }
             # Assume it's either a range or a drive
-            echo "Processing argument: $1"  # Just for debugging purposes
+            # echo "Processing argument: $1"  # Just for debugging purposes
             if [[ $1 == *-* ]]; then
                 # It's a range
                 for drive in $(expand_drive_range "$1"); do
