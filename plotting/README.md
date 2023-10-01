@@ -153,6 +153,9 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
    - `--guru-meditation` : activate a delay if the system has crashed multiple times before (see variable in the script for finetuning)
    - `--help`: display a help text
 
+## Installation
+The systemd services for plotsink and plotstarter are part of the installation routine. You can always use `systemctl enable/disable nameof.service` to (de)activate the service on boot.
+
 ## Examples
    
    Start plotting process, read some variables (for example farmerkey and contract address) from /etc/chiagarden/myfarm.profile

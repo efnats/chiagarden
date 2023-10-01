@@ -42,6 +42,7 @@ files_to_copy=(
   "./plotting/plot_mover"
   "./plotting/plot_over"
   "./plotting/plot_starter"
+  "./plotting/plotsink.sh"
   "./taco_list/taco_list"
 )
 
@@ -55,7 +56,7 @@ for file in "${files_to_copy[@]}"; do
   fi
 done
 
-# Copy the systemd service
+# Copy the systemd services
 if [[ -e "gardenmount/garden-mount.service" ]]; then
   echo -e "\n${YELLOW}Installing garden-mount.service${NC}"
   cp ./gardenmount/garden-mount.service /etc/systemd/system/
@@ -64,11 +65,45 @@ else
   exit 1
 fi
 
+if [[ -e "plotting/plot-starter.service" ]]; then
+  echo -e "\n${YELLOW}Installing plot-starter.service${NC}"
+  cp ./plotting/plot-starter.service /etc/systemd/system/
+else
+  echo -e "${RED}Error: plot-starter.service not found${NC}"
+  exit 1
+fi
+
+if [[ -e "plotting/plotsink.service" ]]; then
+  echo -e "\n${YELLOW}Installing plotsink.service${NC}"
+  cp ./plotting/plotsink.service /etc/systemd/system/
+else
+  echo -e "${RED}Error: plotsink.service not found${NC}"
+  exit 1
+fi
+
+
 # Prompt user to enable the systemd service
-#echo -e "\n${YELLOW}The garden-mount.service manages is for automounting during boot.${NC}"
-read -p "Do you want to enable the garden-mount service? This will automount your drives on boot? [Y/n] " enable_response
+#echo -e "\n${YELLOW}The garden-mount.service is for automounting during boot.${NC}"
+read -p "Do you want to enable the garden-mount service? (Automount drives during boot) [Y/n] " enable_response
 if [[ ! "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
   echo -e "\n${YELLOW}Enabling the garden-mount service...${NC}"
+  systemctl daemon-reload
+  systemctl enable garden-mount.service
+fi
+
+
+echo -e "\n${YELLOW}The plot-starter.service autostarts plotting upon boot. (Select NO if unsure)${NC}"
+read -p "Do you want to enable the plot-starter service? [y/N] " enable_response
+if [[ "$enable_response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+  echo -e "\n${YELLOW}Enabling the plot-starter service...${NC}"
+  systemctl daemon-reload
+  systemctl enable plot-starter.service
+fi
+
+
+read -p "Do you want to enable the plotsink service? [Y/n] " enable_response
+if [[ ! "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
+  echo -e "\n${YELLOW}Enabling the plotsink service...${NC}"
   systemctl daemon-reload
   systemctl enable garden-mount.service
 fi
