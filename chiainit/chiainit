@@ -16,7 +16,7 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
-VERSION="V2.1"
+VERSION="V2.2"
 ACTION=""
 FSTYPE=""
 
@@ -205,30 +205,48 @@ get_drives() {
 }
 
 
+increment_drive() {
+    local drive=$1
+
+    # Base case: If drive is empty, return "a"
+    if [ -z "$drive" ]; then
+        echo "a"
+        return
+    fi
+
+    # Get the last character of the drive and the rest of the drive
+    local lastchar="${drive: -1}"
+    local remainder="${drive%?}"
+
+    # If the last character is not 'z', increment it
+    if [ "$lastchar" != "z" ]; then
+        local nextchar=$(printf "\\$(printf '%03o' "$(( $(printf '%d' "'$lastchar'") + 1 ))" )")
+        echo "${remainder}${nextchar}"
+    else
+        # If the last character is 'z', set it to 'a' and increment the next character recursively
+        echo "$(increment_drive "$remainder")a"
+    fi
+}
+
 expand_drive_range() {
     local range="$1"
+    local prefix="sd"
+    
+    # Split the range into start and end using dash as delimiter
+    local start="${range%-*}"
+    local end="${range#*-}"
 
-    # Split the input into prefix, start, and end
-    local prefix="${range%%[a-z]*}"
-    local range_without_prefix="${range#"$prefix"}"
-    local start="${range_without_prefix%-*}"
-    local end="${range##*-}"
+    # Remove prefix
+    start="${start#$prefix}"
+    end="${end#$prefix}"
 
-    # Extract the last character of the start and end (e.g., "b" from "sdb")
-    local start_char="${start: -1}"
-    local end_char="${end: -1}"
+    local current_drive="$start"
 
-    # Convert the characters into their ASCII values
-    local start_ascii=$(printf '%d\n' "'$start_char")
-    local end_ascii=$(printf '%d\n' "'$end_char")
-
-    # Loop from start to end and print each drive in the range
-    while [[ $start_ascii -le $end_ascii ]]; do
-        echo "${prefix}${start:0:${#start}-1}$(printf \\$(printf '%03o' $start_ascii))"
-        
-        # Increment the ASCII value
-        ((start_ascii++))
+    while [ "$current_drive" != "$end" ]; do
+        echo "${prefix}${current_drive}"
+        current_drive=$(increment_drive "$current_drive")
     done
+    echo "${prefix}${current_drive}"
 }
 
 
@@ -383,10 +401,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         --exclude)
             while [[ "$#" -gt 1 && ! "$2" =~ ^-- ]]; do
-                EXCLUDED_DRIVES+=("$2")
-                shift 2
+                echo "Processing exclusion: $2"  # Debug print
+                # Check if it's a range
+                if [[ $2 == *-* ]]; then
+                    for drive in $(expand_drive_range "${2%-*}" "${2##*-}"); do
+                        EXCLUDED_DRIVES+=("$drive")
+                    done
+                else
+                    EXCLUDED_DRIVES+=("$2")
+                fi
+                shift  # Shift once for the processed argument
             done
-            shift
+            shift  # Shift once for the --exclude option itself
             ;;
         --help)
             help
@@ -395,22 +421,19 @@ while [[ $# -gt 0 ]]; do
         *)
             [ -z "$ACTION" ] && { display_usage; exit 1; }
             # Assume it's either a range or a drive
-            echo "Processing argument: $1" >&2  # Debug line
-            
+            echo "Processing argument: $1"  # Just for debugging purposes
             if [[ $1 == *-* ]]; then
                 # It's a range
                 for drive in $(expand_drive_range "$1"); do
-                    echo "Adding drive: $drive to DRIVES array" >&2  # Debug line
                     DRIVES+=("$drive")
                 done
             else
                 # It's a single drive
-                echo "Adding single drive: $1 to DRIVES array" >&2  # Debug line
                 DRIVES+=("$1")
             fi
             shift
             ;;
-    esac
+        esac
 done
 
 

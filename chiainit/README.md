@@ -12,7 +12,7 @@ Other tools in this repo rely on drives being labelled in this fashion so they c
 - Lots of safety questions before doing anything
 - System drives (disks where any partition is mounted as /) are never processed
 - Mounted drives are never processed
-- Supports various methods for drive selection (-all, --exclude, drive ranges like sda-sdz)
+- Supports various methods for drive selection (-all, --exclude, drive ranges like sda-sdbz)
 
 ## Requirements
 
@@ -23,7 +23,7 @@ Other tools in this repo rely on drives being labelled in this fashion so they c
 ## Usage
 <pre>
 Usage: chiainit [OPTIONS] [drive-range1] [drive-range2] [...] driveN
-Example: chiainit --fstype ext4 --init sda-sdm sdq-sdx sdz
+Example: chiainit --fstype ext4 --init sda-sdm sdq-sdah sdbz
 
 Options
 --help: Show help text
