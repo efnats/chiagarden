@@ -5,8 +5,8 @@
 ################################################
 
 min_free_space=100 # minimum free space in GB
-amount_free_disks=5 # desired amount of disks with min_free_space
-replot_levels="0,1,2,3,4,5,6" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
+amount_free_disks=10 # desired amount of disks with min_free_space
+replot_levels="0,1,2,3,4,5,6,7,8" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
 search_depth=10 # maximum search depth for plot files - how many subdir levels should we iterate?
 interval=25 # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
 logfile="/var/log/plot_over.log" # set to a valid path or leave empty to disable logging
@@ -22,7 +22,8 @@ BOLD="\033[1m"
 RESET="\033[0m"
 
 subdir="" # Default parameter for your first subdirectory for plots in Disk. This is set in the commandline now.
-plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1*.plot' 'plot-k32-c2*.plot' 'plot-k32-c3*..plot' 'plot-k32-c4*.plot' 'plot-k32-c5*.plot' 'plot-k32-c6*.plot' 'plot-k32-c7*.plot' 'plot-k32-c8*.plot' 'plot-k32-c9*.plot')
+# add support for Gigahoese 2.x and Bladebit
+plot_patterns=('plot-k32-202*.plot' 'SPECIAL_PATTERN_1' 'SPECIAL_PATTERN_2' 'SPECIAL_PATTERN_3' 'SPECIAL_PATTERN_4' 'SPECIAL_PATTERN_5' 'SPECIAL_PATTERN_6' 'SPECIAL_PATTERN_7' 'SPECIAL_PATTERN_8' 'SPECIAL_PATTERN_9' 'plot-k32-c10-*.plot' 'plot-k32-c11-*.plot' 'plot-k32-c12-*.plot' 'plot-k32-c13-*.plot' 'plot-k32-c14-*.plot' 'plot-k32-c15-*.plot')
 min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
 IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
 
@@ -194,7 +195,6 @@ function display_free_disks_info() {
 }
 
 
-# Find the oldest plot over the entire disk array matching the given pattern
 function find_oldest_plot() {
   local level=$1
   oldest_file=""
@@ -202,7 +202,14 @@ function find_oldest_plot() {
   file_count=0
 
   for disk in "${disks[@]}"; do
-    find_output=$(find "$disk" -maxdepth "$search_depth" -type f -name "${plot_patterns[$level]}" -printf '%T@ %p\n' 2>/dev/null)
+    # Check if the level is within the range of 1 to 9, which corresponds to the special patterns
+    if [[ "$level" -ge 1 && "$level" -le 9 ]]; then
+      single_digit=$(($level))
+      double_digit=$(printf "%02d" $level)
+      find_output=$(find "$disk" -maxdepth "$search_depth" -type f \( -name "plot-k32-c${single_digit}-*.plot" -o -name "plot-k32-c${double_digit}-*.plot" \) -printf '%T@ %p\n' 2>/dev/null)
+    else
+      find_output=$(find "$disk" -maxdepth "$search_depth" -type f -name "${plot_patterns[$level]}" -printf '%T@ %p\n' 2>/dev/null)
+    fi
 
     if [ -n "$find_output" ]; then
       while IFS= read -r line; do
@@ -218,6 +225,7 @@ function find_oldest_plot() {
     fi
   done
 }
+
 
 
 # Remove identified plot and log action into logfile
