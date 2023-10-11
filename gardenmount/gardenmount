@@ -1,38 +1,456 @@
 #!/bin/bash
 
+btrfs_mounted_loop=""
+
+# Default max size for slack in bytes (110GB)
+max_size=$((110 * 1024 * 1024 * 1024))
+
+
+# ANSI Color Codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+RESET='\033[0m' # No Color
+
+
 usage() {
-    echo "Usage: $0 [--label LABEL_PREFIX] [--mount [MOUNT_POINT]]|--unmount [--read-only] [--mergerfs [MERGERFS_PATH]]"
+    echo "Usage: $0 [--label LABEL_PATTERN] [--mount [MOUNT_POINT]]|--unmount [--read-only] [--mergerfs [MERGERFS_PATH]] [--slack [SLACK_PATH]] [--maxsize SIZE] [--no-prompt]"
     echo "Example: $0 --mount --label 'CHIA'"
     exit 1
 }
 
+
 help() {
-    echo "Mounts or unmounts devices with a specified label prefix."
+    echo "Mounts or unmounts devices with a specified label pattern."
     echo
-    echo "Usage: $0 [--mount [MOUNT_POINT]]|--unmount [--label LABEL_PREFIX] [--read-only] [--mergerfs [MERGERFS_PATH]]"
+    echo "Usage: $0 [--mount [MOUNT_POINT]]|--unmount [--label LABEL_PATTERN] [--read-only] [--mergerfs [MERGERFS_PATH]] [--slack [SLACK_PATH]] [--maxsize SIZE] [--no-prompt]"
     echo
     echo "Options:"
-    echo "  --mount [PATH]       Mount devices with the specified label prefix. Optionally, specify the mount point base directory (default: '/media/username')."
-    echo "  --unmount            Unmount devices with the specified label prefix. Unmount the MergerFS mountpoint if it exists."
-    echo "  --label PREFIX       Specify the label prefix of the devices to mount/unmount (default: 'CHIA')."
-    echo "  --read-only          Mount devices as read-only."
-    echo "  --mergerfs [PATH]    Use MergerFS to combine the mounted devices into a single drive-like filesystem. (default: '/mnt/garden')"
-    echo "  --help               Display this help message and exit."
+    echo "  --mount [PATH]          Mount devices with the specified label pattern. Optionally, specify the mount point base directory (default: '/media/username')."
+    echo "  --unmount               Unmount devices with the specified label pattern. Unmount the MergerFS mountpoint if it exists."
+    echo "  --label PATTERN         Specify the label pattern of the devices to mount/unmount (default: 'CHIA')."
+    echo "  --read-only             Mount devices as read-only."
+    echo "  --mergerfs [PATH]       Use MergerFS to combine the mounted devices into a single drive-like filesystem. (default: '/mnt/garden')"
+    echo "  --slack [PATH]          Mount feature to mount raid0 using loop devices to make use of remaining disk space (default: '/mnt/slack')."
+    echo "  --maxsize SIZE          Set the maximum allowed size for slack space to be mounted in GB. Set this to higher than your expected plot file."
+    echo "  --no-prompt             Runs the script in non-interactive mode."
+    echo "  --print-fstab           Print the fstab entries to copy and paste into /etc/fstab. Better: use the systemd services provided in the chiagarden repository"
+    echo "  --help                  Display this help message and exit."
     echo
-    echo "Example:"
-    echo "  $0 --mount --label 'CHIA' --mergerfs"
+    echo "Examples:"
+    echo "mount disks with the label 'CHIA' and mount the MergerFS in /mnt/garden"
+    echo "gardenmount --mount --mergerfs"
+    echo "mount disks with the label 'GIGA', mount MergerFS in /mnt/garden, and mount slack space to /mnt/slack, skip mounting available space is larger than 80GB" 
+    echo "gardenmount --mount --label 'GIGA' --mergerfs --slack --maxsize 80"
+    echo "mount disks with the label 'CHIA' and print the fstab entries for the mounted disks and MergerFS"
+    echo "gardenmount --mount --print-fstab"
+    echo "mount disks with the label 'CHIA', MergerFS and slack with 80GB max, read-only and do not prompt for confirmation (for systemd)"
+    echo "gardenmount --mount --mergerfs --slack --maxsize 80 --read-only --no-prompt"
     exit 1
 }
+
+
+print_fstab_instructions() {
+    echo
+    echo "# Add these entries to /etc/fstab to make mounting of your CHIA drives persistant"
+    echo "or (better!) use the systemd services provided in the chiagarden repository"
+    echo ""
+    echo "# CHIA disks"
+    for device in "${mounted_devices[@]}"; do
+        uuid=$(blkid -s UUID -o value "$device")
+        mount_info=$(findmnt -n -o TARGET,OPTIONS "$device")
+        if [ -n "$mount_info" ]; then
+            read -r mounted_path mounted_options <<<"$mount_info"
+            fstype=$(blkid -s TYPE -o value "$device")
+            echo "UUID=$uuid $mounted_path $fstype $mounted_options 0 0"
+        fi
+    done
+    echo ""
+    
+
+    # Output corresponding line for fstab (after the other mountpoint lines)
+    if [ -n "$mergerfs_path" ]; then
+        mergerfs_fstab_line="$mount_point/$label_pattern* $mergerfs_path fuse.mergerfs $mergerfs_mount_options 0 0"
+        echo "# MergerFS"
+        echo "$mergerfs_fstab_line"
+    fi
+    echo ""
+
+    if [ -n "$btrfs_mounted_loop" ]; then
+        uuid=$(blkid -s UUID -o value "$btrfs_mounted_loop")
+        # Assuming defaults as the mounting options and btrfs as the filesystem type.
+        echo "# BTRFS raid0 entry for loop devices from slack space"
+        echo "UUID=$uuid $slack_path btrfs defaults 0 0"
+    fi
+    echo ""
+}
+
+
+get_available_loop() {
+    local -a loop_numbers
+    local loop_device
+
+    # Extract all loop device numbers
+    for loop_device in /dev/loop[0-9]*; do
+        if [[ $loop_device =~ /dev/loop([0-9]+) ]]; then
+            loop_numbers+=(${BASH_REMATCH[1]})
+        fi
+    done
+
+    # Sort the loop numbers
+    IFS=$'\n' sorted_nums=($(sort -n <<<"${loop_numbers[*]}"))
+    unset IFS
+
+    # Check for the first available loop device
+    for num in "${sorted_nums[@]}"; do
+        if ! losetup "/dev/loop$num" &> /dev/null; then
+            # This loop device is free.
+            echo "/dev/loop$num"
+            return
+        fi
+    done
+
+    # If we reach here, we didn't find an available loop device. Create a new one.
+    local next_num
+    if [[ ${#sorted_nums[@]} -gt 0 ]]; then
+        next_num=$(( ${sorted_nums[-1]} + 1 ))
+    else
+        next_num=0
+    fi
+
+    mknod -m 660 "/dev/loop$next_num" b 7 $next_num
+    chown root:disk "/dev/loop$next_num"
+    echo "/dev/loop$next_num"
+}
+
+
+mount_disk() {
+    local disk="$1"
+    local mount_options="rw,noatime"
+    if [ "$read_only" == "yes" ]; then
+        mount_options="ro,noatime"
+    fi
+
+    local device=$(readlink -f "$disk")
+    found_disks=$((found_disks + 1))
+    local disk_mount_point="$mount_point/$(basename "$disk")"
+    mkdir -p "$disk_mount_point"
+    mount -v -o "$mount_options" "$device" "$disk_mount_point" && mounted_devices+=("$device")
+}
+
+
+mount_slack_losetup() {
+    local disk_mount_point="$1"
+    local loop_device
+
+    if [ ! -f "$disk_mount_point/slack.img" ]; then
+        local remaining_space=$(df --output=avail "$disk_mount_point" | tail -1)
+        remaining_space=$(( (remaining_space - 1024) * 1024 ))
+        
+        # Check against max_size
+        if [ "$remaining_space" -le "$max_size" ]; then
+            # Ensure the size is a multiple of 512 bytes
+            remaining_space=$(( remaining_space / 512 * 512 ))
+            remaining_space_gb=$(echo "scale=2; $remaining_space / (1024*1024*1024)" | bc)
+            echo "creating $disk_mount_point/slack.img (${remaining_space_gb}GB). Be patient.." >&2
+            fallocate -l "$remaining_space" "$disk_mount_point/slack.img"
+            if [ $? -ne 0 ]; then
+                echo "Failed to create slack.img on $disk_mount_point"
+                return  # skip to the next disk
+            fi
+        else
+            remaining_space_gb=$(echo "scale=2; $remaining_space / (1024*1024*1024)" | bc)
+            echo "Remaining space on $disk_mount_point exceeds max size. Available: ${remaining_space_gb}GB. Skipping allocation." >&2
+            echo "SKIP" # Use "SKIP" as the distinct marker
+            return 
+        fi
+    fi
+
+    loop_device=$(get_available_loop)
+    slack_size_bytes=$(du -b "$disk_mount_point/slack.img" | cut -f1)
+    slack_size_gb=$(echo "scale=2; $slack_size_bytes / (1024*1024*1024)" | bc)
+    echo "attaching $loop_device to $disk_mount_point (${slack_size_gb}GB)" >&2
+    losetup $loop_device "$disk_mount_point/slack.img"
+    if [ $? -ne 0 ]; then
+        echo "Failed to set up loop device for $disk_mount_point/slack.img"
+        return  # skip to the next disk
+    fi
+echo "$loop_device"
+
+}
+
+
+mount_slack_btrfs() {
+    local loop_devices=("$@")
+    local btrfs_mounted=false
+    
+    for loop in "${loop_devices[@]}"; do
+        if mount -t btrfs "$loop" "$slack_path" &>/dev/null; then
+            echo "btrfs found! mounting from $loop to $slack_path"
+            btrfs_mounted=true
+            btrfs_mounted_loop="$loop"  # Reintroducing the line here
+            break
+        fi
+    done
+    
+    if [ "$btrfs_mounted" == "false" ]; then
+        echo "No existing btrfs filesystem found."
+        echo "Loop devices: ${loop_devices[*]}"
+
+        local create_btrfs=false
+        if [ "$no_prompt" == "yes" ]; then
+            echo "Running in non-interactive mode. Skipping filesystem creation."
+        else
+            read -p "Do you want to create a new raid0 btrfs filesystem on these loop devices? (y/N) " -i "N" choice
+            [[ $choice == "y" || $choice == "Y" ]] && create_btrfs=true
+        fi
+
+
+        if [ "$create_btrfs" == "true" ]; then
+            # Display the command for debugging
+            #echo "Executing: mkfs.btrfs -d raid0 ${loop_devices[*]}"
+
+            if output=$(mkfs.btrfs -d raid0 "${loop_devices[@]}" 2>&1); then
+                echo "btrfs filesystem created successfully."
+                mount -t btrfs "${loop_devices[0]}" "$slack_path" && echo "new btrfs filesystem mounted."
+            else
+                echo "error creating btrfs filesystem:"
+                echo "$output"
+            fi
+        fi
+    fi
+
+    if [ "$btrfs_mounted" == "true" ]; then
+    # Get the devices associated with the btrfs filesystem
+    mapfile -t btrfs_devices < <(btrfs filesystem show "$slack_path" | grep -oP '/dev/loop\d+')
+
+    # List all loop devices associated with slack.img
+    mapfile -t all_loops < <(losetup -a | grep 'slack.img' | cut -d: -f1)
+
+    # Find loop devices not already part of the Btrfs filesystem
+    declare -a missing_loops
+    for loop in "${all_loops[@]}"; do
+        if ! [[ " ${btrfs_devices[*]} " =~ " ${loop} " ]]; then
+            missing_loops+=("$loop")
+        fi
+    done
+
+    # If there are any missing loops, offer to add them to the btrfs filesystem
+    if [ ${#missing_loops[@]} -gt 0 ]; then
+    echo "New slack space detected."
+    for loop in "${missing_loops[@]}"; do 
+        # Fetch the backing file for the loop device using losetup
+        backing_file=$(losetup --list | grep "$loop" | awk '{print $6}')
+        
+        # If there's no backing file found, continue to the next loop device
+        if [ -z "$backing_file" ]; then
+            echo " - $loop, No backing file found."
+            continue
+        fi
+        
+        # Fetch free space for the backing file
+        free_space=$(ls -lh "$backing_file" | awk '{print $5}')
+
+        echo "$backing_file - Size: $free_space"
+    done
+
+    if [ "$no_prompt" == "yes" ] || { read -p "Add these to the existing btrfs filesystem? (Y/n) " choice && [[ "$choice" =~ ^[Yy]$ || -z "$choice" ]]; }; then
+        btrfs device add "${missing_loops[@]}" "$slack_path"
+        echo "Devices added to the btrfs filesystem."
+    fi
+  fi
+fi
+}
+
+
+
+mount_mergerfs() {
+    if [ -n "$mergerfs_path" ] && [ ${#mounted_devices[@]} -gt 0 ]; then
+        mkdir -p "$mergerfs_path"
+        local mergerfs_mount_options="use_ino,cache.files=full,minfreespace=5G,moveonenospc=true,dropcacheonclose=true,allow_other,fsname=garden,category.create=mfs"
+        local mergerfs_sources=""
+        local slack_added=false
+
+        for device in "${mounted_devices[@]}"; do
+            local mount_info=$(findmnt -n -o TARGET "$device")
+            if [ -n "$mount_info" ]; then
+                mergerfs_sources+="$mount_info:"
+            fi
+        done
+
+        # Check if slack_path is mounted and add it to the mergerfs_sources
+        if findmnt -n "$slack_path" > /dev/null 2>&1; then
+            mergerfs_sources+="$slack_path:"
+            slack_added=true
+        fi
+
+        mergerfs_sources="${mergerfs_sources::-1}"  # Remove the trailing colon
+        mergerfs -o "$mergerfs_mount_options" "$mergerfs_sources" "$mergerfs_path"
+
+        # Provide feedback based on whether slack_path was added
+        if $slack_added; then
+            echo "mounting $mount_point/$label_pattern and $slack_path to $mergerfs_path using MergerFS"
+        else
+            echo "mounting $mount_point/$label_pattern to $mergerfs_path using MergerFS"
+        fi
+    fi
+}
+
+
+mount_action() {
+
+    # Unmount first to ensure we don't have any conflicts
+    echo
+    echo -e "${YELLOW}Unmounting disks to prevent conflicts..${RESET}"
+    unmount_action > /dev/null 2>&1  
+    
+    # Mount all the disks
+    echo
+    echo -e "${YELLOW}Mounting disks..${RESET}"
+    while IFS= read -r disk; do
+        mount_disk "$disk"
+    done < <(find /dev/disk/by-label -name "$label_pattern")
+
+    # If slack argument was given, process slack mounts
+    if [ "$slack" == "yes" ]; then
+        declare -a loop_devices
+        echo
+        echo -e "${YELLOW}Processing slack mounts..${RESET}"
+        # Ensure slack_path exists
+        [ ! -d "$slack_path" ] && mkdir -p "$slack_path"
+
+        for device in "${mounted_devices[@]}"; do
+            local disk_mount_point=$(findmnt -n -o TARGET "$device")
+            if [ -n "$disk_mount_point" ]; then
+                loop_device=$(mount_slack_losetup "$disk_mount_point")
+                if [ "$loop_device" != "SKIP" ]; then  # Only append if the returned value isn't "SKIP"
+                    loop_devices+=("$loop_device")
+                fi
+            fi
+        done
+
+        # Mount or offer to create the Btrfs filesystem
+        mount_slack_btrfs "${loop_devices[@]}"
+    fi
+    
+    # If mergerfs argument was given, process mergerfs mount
+    if [ "$mergerfs" == "yes" ]; then
+        echo
+        echo -e "${YELLOW}Mounting MergerFS..${RESET}"
+        mount_mergerfs
+    fi
+
+    echo
+    echo -e "${GREEN}$found_disks disks found and processed.${RESET}"
+}
+
+
+
+
+unmount_disk() {
+    local device="$1"
+    local mount_info=$(findmnt -n -o SOURCE,TARGET "$device")
+    if [ -n "$mount_info" ]; then
+        read -r mounted_device mounted_path <<<"$mount_info"
+        umount -v "$mounted_device"
+    fi
+}
+
+
+unmount_mergerfs() {
+    local mergerfs_mount_info=$(findmnt -t fuse.mergerfs -n -o SOURCE,TARGET,OPTIONS)
+    if [ -n "$mergerfs_mount_info" ]; then
+        read -r mergerfs_source mergerfs_target mergerfs_options <<<"$mergerfs_mount_info"
+        umount -v "$mergerfs_target"
+    fi
+}
+
+
+unmount_slack() {
+    local mounted_path="$1"
+    local slack_path="/mnt/slack"
+
+    # Try to unmount the slack_path first
+    if mountpoint -q "$slack_path"; then
+        #echo "Unmounting $slack_path.."
+        umount -v "$slack_path"
+    fi
+
+    # Detach loop devices associated with slack.img files
+    if [ -f "$mounted_path/slack.img" ]; then
+        losetup --associated "$mounted_path/slack.img" | while IFS=: read -r loop_device rest; do
+            if [ -b "$loop_device" ]; then
+                echo "detaching $loop_device from $mounted_path/slack.img.." >&2
+                losetup -d "$loop_device"
+            fi
+        done
+    fi
+}
+
+
+
+unmount_cleanup() {
+    local mounted_path="$1"
+
+    # Remove if the specified directory is empty
+    if [ -d "$mounted_path" ] && [ -z "$(ls -A "$mounted_path")" ]; then
+        echo "Removing empty directory: $mounted_path"
+        rmdir "$mounted_path"
+    fi
+
+    # Remove slack_path if it is empty
+    if [ -d "$slack_path" ] && [ -z "$(ls -A "$slack_path")" ]; then
+        echo "Removing empty directory: $slack_path"
+        rmdir "$slack_path"
+    fi
+}
+
+
+unmount_action() {
+    # First, unmount the slack images
+    echo
+    echo -e "${YELLOW}Unmounting slack images..${RESET}"
+    while IFS= read -r disk; do
+        local device=$(readlink -f "$disk")
+        found_disks=$((found_disks + 1))
+        unmount_slack "$(findmnt -n -o TARGET "$device")"
+    done < <(find /dev/disk/by-label -name "$label_pattern")
+
+    # Next, unmount the fuse.mergerfs filesystem
+    echo
+    echo -e "${YELLOW}Unmounting MergerFS..${RESET}"
+    unmount_mergerfs
+
+    # Finally, unmount the disks and perform cleanup tasks
+    echo
+    echo -e "${YELLOW}Unmounting disks and performing cleanup..${RESET}"
+    while IFS= read -r disk; do
+        local device=$(readlink -f "$disk")
+        unmount_disk "$device"
+        unmount_cleanup "$(findmnt -n -o TARGET "$device")"
+    done < <(find /dev/disk/by-label -name "$label_pattern")
+    
+    echo
+    echo -e "${GREEN}$found_disks disks unmounted.${RESET}"
+}
+
+
+
+action=""
+label_pattern="CHIA*"
+read_only=""
+mount_point=""
+mergerfs_path=""
+slack_path="/mnt/slack"
+no_prompt="no"
 
 if [ "$#" -lt 1 ]; then
     usage
 fi
 
-action=""
-label_prefix="CHIA"
-read_only=""
-mount_point=""
-mergerfs_path=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -52,7 +470,7 @@ while [ "$#" -gt 0 ]; do
             shift
             ;;
         --label)
-            label_prefix="$2"
+            label_pattern="$2"
             shift 2
             ;;
         --read-only)
@@ -60,12 +478,41 @@ while [ "$#" -gt 0 ]; do
             shift
             ;;
         --mergerfs)
+            mergerfs="yes"
             if [ -z "$2" ] || [[ "$2" == --* ]]; then
                 mergerfs_path="/mnt/garden"
             else
                 mergerfs_path="$2"
                 shift
             fi
+            shift
+            ;;
+        --slack)
+            slack="yes"
+            if [ -z "$2" ] || [[ "$2" == --* ]]; then
+                slack_path="/mnt/slack"
+            else
+                slack_path="$2"
+                shift
+            fi
+            shift
+            ;;
+        --maxsize)
+            if [[ "$2" =~ ^[0-9]+$ ]]; then  # checks if the next argument is a number
+                max_size=$(( $2 * 1024 * 1024 * 1024 ))  # convert GB to bytes
+                shift
+            else
+                echo "Error: Please specify a valid number (in GB) for --maxsize"
+                exit 1
+            fi
+            shift
+            ;;
+        --no-prompt)
+            no_prompt="yes"
+            shift
+            ;;
+        --print-fstab)
+            print_fstab="yes"
             shift
             ;;
         --help)
@@ -78,106 +525,42 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-if [ -z "$action" ]; then
-    echo "Please specify an action: --mount or --unmount"
-    usage
-fi
 
-
-
-label_pattern="${label_prefix}*"
 found_disks=0
 username=$(whoami)
-
-if [ -z "$mount_point" ]; then
-    mount_point="/media/$username"
-fi
-
 mounted_devices=()
 
-if [ "$action" == "mount" ]; then
-    mount_options="rw,noatime"
-    if [ "$read_only" == "yes" ]; then
-        mount_options="ro,noatime"
-    fi
 
-    while IFS= read -r disk; do
-        device=$(readlink -f "$disk")
-        disk_mount_point="$mount_point/$(basename "$disk")"
-        mkdir -p "$disk_mount_point"
-        mount -v -o "$mount_options" "$device" "$disk_mount_point" && mounted_devices+=("$device")
-        found_disks=1
-    done < <(find /dev/disk/by-label -name "$label_pattern")
 
-    if [ -n "$mergerfs_path" ] && [ ${#mounted_devices[@]} -gt 0 ]; then
-        mkdir -p "$mergerfs_path"
-        mergerfs_mount_options="use_ino,cache.files=full,minfreespace=5G,moveonenospc=true,dropcacheonclose=true,allow_other,fsname=garden,category.create=mfs"
-        mergerfs_sources=""
-        for device in "${mounted_devices[@]}"; do
-            mount_info=$(findmnt -n -o TARGET "$device")
-            if [ -n "$mount_info" ]; then
-                mergerfs_sources+="$mount_info:"
-            fi
-        done
-        mergerfs_sources="${mergerfs_sources::-1}"  # Remove the trailing colon
-        mergerfs -o "$mergerfs_mount_options" "$mergerfs_sources" "$mergerfs_path"
-        echo "mounting $mount_point/$label_prefix* to $mergerfs_path using MergerFS"
-    fi
+case "$action" in
+    "mount")
+        mount_action
 
-elif [ "$action" == "unmount" ]; then
-    # Unmount the fuse.mergerfs filesystem with the fsname garden first
-    mergerfs_mount_info=$(findmnt -t fuse.mergerfs -n -o SOURCE,TARGET,OPTIONS)
-    if [ -n "$mergerfs_mount_info" ]; then
-        read -r mergerfs_source mergerfs_target mergerfs_options <<<"$mergerfs_mount_info"
-        umount -v "$mergerfs_target"
-    fi
-
-    # Unmount the other disks
-    while IFS= read -r disk; do
-        device=$(readlink -f "$disk")
-        mount_info=$(findmnt -n -o SOURCE,TARGET "$device")
-        if [ -n "$mount_info" ]; then
-            read -r mounted_device mounted_path <<<"$mount_info"
-            umount -v "$mounted_device"
-            found_disks=1
-
-            # Check if the directory is empty and remove it
-            if [ -d "$mounted_path" ] && [ -z "$(ls -A "$mounted_path")" ]; then
-                rmdir "$mounted_path"
+        if [ "$print_fstab" == "yes" ]; then
+            if [ ${#mounted_devices[@]} -gt 0 ]; then
+                print_fstab_instructions
+            else
+                echo "No disks found with the label pattern: $label_pattern"
             fi
         fi
-    done < <(find /dev/disk/by-label -name "$label_pattern")
-else
-    echo "Invalid action: '$action'. Use '--mount' or '--unmount'."
-    exit 1
-fi
+        ;;
 
-if [ "$found_disks" -eq 0 ]; then
-    echo "No disks found with the label pattern: $label_pattern"
-fi
+    "unmount")
+        unmount_action
 
-if [ "$action" == "mount" ] && [ ${#mounted_devices[@]} -gt 0 ]; then
-    echo
-    echo "# Add these entries to /etc/fstab to make mounting of your CHIA drives persistant"
-    echo "or (better!) use the systemd services provided in the chiagarden repository"
-    echo ""
-    echo "# CHIA disks"
-    for device in "${mounted_devices[@]}"; do
-        uuid=$(blkid -s UUID -o value "$device")
-        mount_info=$(findmnt -n -o TARGET,OPTIONS "$device")
-        if [ -n "$mount_info" ]; then
-            read -r mounted_path mounted_options <<<"$mount_info"
-            fstype=$(blkid -s TYPE -o value "$device")
-            echo "UUID=$uuid $mounted_path $fstype $mounted_options 0 0"
+        if [ "$found_disks" -eq 0 ]; then
+            echo "No disks found with the label pattern: $label_pattern"
         fi
-    done
-    echo ""
+        ;;
 
-    # Output corresponding line for fstab (after the other mountpoint lines)
-    if [ -n "$mergerfs_path" ]; then
-        mergerfs_fstab_line="$mount_point/$label_prefix* $mergerfs_path fuse.mergerfs $mergerfs_mount_options 0 0"
-        echo "# MergerFS"
-        echo "$mergerfs_fstab_line"
-    fi
-fi
+    "")
+        echo "Please specify an action: --mount or --unmount"
+        usage
+        ;;
+
+    *)
+        echo "Invalid action: '$action'. Use '--mount' or '--unmount'."
+        exit 1
+        ;;
+esac
 

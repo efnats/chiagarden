@@ -5,6 +5,7 @@ Description=(un)mount all chia-labelled drives and mergerfs filesystem
 RemainAfterExit=yes
 Type=oneshot
 ExecStart=/usr/local/bin/gardenmount --mount --mergerfs /mnt/garden
+#ExecStart=/usr/local/bin/gardenmount --mount --mergerfs --slack --maxsize 81 --no-prompt
 ExecStop=/usr/local/bin/gardenmount --unmount
 
 [Install]

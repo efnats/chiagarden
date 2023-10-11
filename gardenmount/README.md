@@ -1,23 +1,34 @@
 # gardenmount - Mass disk (un)mounter for PoST farming
 
-This script helps you mount or unmount Chia-labelled drives based on a specified label prefix. Additionally, this repository provides two systemd service files for managing the mounting and unmounting process.
-When mounting drives, the script will print all mount entries with their corresponding UUIDs in a format directly usable in `/etc/fstab` for easy copy/pasting. But please consider using the systemd services provided. This is the way.
+gardenmount facilitates the automatic mounting and unmounting of CHIA-labelled drives. It can produce mount entries suitable for direct inclusion into /etc/fstab. However, for enhanced efficiency, the script comes paired with systemd service files, which are the recommended method for managing mounts.
+
+Additionally, gardenmount integrates with mergerfs. This tool merges multiple mounted devices into a single unified file system, streamlining file and folder management. Potential performance issues may arise with mergerfs when scaling beyond 20 HDDs, but its ability to organize data across multiple drives is undeniably handy and with the provided write policy "mfs", drives will be filled evenly during the plotting phase making sure to utilize a new disk for each copy process.
+
+The 'slack' feature allows for optimized space utilization across hard drives to create a btrfs raid0 and mount it to a desired mount point (default /mnt/slack). A failure in one disk will compromise the entire raid0. Nonetheless, the raid can be easily reestablished, and it auto-expands with the addition of new disks. The maxsize parameter skips the slack file creation if it surpasses a set limit, ideally set above the smallest expected plot size.
 
 ## Requirements
 
 - mergerfs https://github.com/trapexit/mergerfs (only for mounting all disks in a single-drive-like filesystem, not required for mounting the disks)
 - have your disks labelled with a unified pattern (see chiainit)
+- btrfs (is usually part of the kernel)
 
 ## Usage
 
-The script has the following command-line options:
+`gardenmount [--label LABEL_PATTERN] [--mount [MOUNT_POINT]]|--unmount [--read-only] [--mergerfs [MERGERFS_PATH]] [--slack [SLACK_PATH]] [--maxsize SIZE] [--no-prompt]`
 
-- `--mount`: Mounts all drives that have the specified label prefix
-- `--unmount`: Unmounts all drives that have the specified label prefix
-- `--label LABEL_PREFIX`: Specifies the label prefix to use for matching drives (default: CHIA)
-- `--read-only`: Mounts the drives as read-only (only applicable with `--mount`)
-- `--mount-point [PATH]`: Mounts the drives into thes specified mountpoint (default: /media/[username])
-- `--mergerfs [PATH]`: Use MergerFS to combine the mounted devices into a single drive-like filesystem. (default: /mnt/garden)
+
+## Options
+
+- `--mount [PATH]`: Mount devices with the specified label pattern. Optionally, specify the mount point base directory. Default is `/media/username`. 
+- `--unmount`: Unmount devices with the specified label pattern. Also unmounts the MergerFS mountpoint if it exists.  
+- `--label PATTERN`: Specifies the label pattern of the devices to mount or unmount. Default pattern is 'CHIA'.
+- `--read-only`: Mount the devices in read-only mode.  
+- `--mergerfs [PATH]`: Use MergerFS to merge the mounted devices into a singular filesystem, creating a unified view of your data. The default mount point is `/mnt/garden`.
+- `--slack [PATH]`: Utilizes the slack space across drives by mounting a raid0 structure using loop devices. The default mount point for this feature is `/mnt/slack`.
+- `--maxsize SIZE`: Determines the maximum allowed size for the slack space that's mounted, given in GB. It's recommended to set this value higher than your expected plot file size.
+- `--no-prompt`: Executes the script in a non-interactive mode, avoiding any prompts.
+- `--print-fstab`: Outputs the fstab entries, making it easy to copy and paste into `/etc/fstab`. For an optimal experience, consider using the systemd services provided in the chiagarden repository.
+- `--help`: Displays the command help.
 
 #### Examples
 
@@ -39,7 +50,13 @@ The script has the following command-line options:
 ./gardenmount --mount --mergerfs
 ```
 
-4. Unmount all drives withe label CHIA (previously mounted on any mountpoint)
+4. Mount all drives with the label prefix 'CHIA' in /meda/root and mount these disks in a single-drive-like filesystem in /mnt/garden using MergerFS. Create loop devices from slack space and mount it on /mnt/slack using btrfs raid0. Ignore disks which have more than 80GB slack space (still offering enough space for directly storing plot(s))
+
+```bash
+./gardenmount --mount --mergerfs --slack --maxsize 80
+```
+
+5. Unmount all drives withe label CHIA (previously mounted on any mountpoint)
 ```bash
 ./gardenmount --unmount
 ```
@@ -54,7 +71,7 @@ The `garden-mount.service` is a systemd service that is responsible for automati
 
 ### Usage
 
-Copy the systemd services to their directories and start/enable the service
+Copy the systemd services to their directories and start/enable the service or use the provided `install.sh` in the main folder
 ```bash
 sudo cp garden-mount.service /etc/systemd/system/
 sudo cp gardenmount /usr/local/bin/
