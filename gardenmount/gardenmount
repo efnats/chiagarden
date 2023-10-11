@@ -369,9 +369,17 @@ unmount_mergerfs() {
 }
 
 
+
+
 unmount_slack() {
     local mounted_path="$1"
     local slack_path="/mnt/slack"
+
+    # Identify the loop device and mount point for a BTRFS mount that uses loop devices
+    local findloop=$(mount | grep 'type btrfs' | grep '/dev/loop')
+    if [ -n "$findloop" ]; then
+        slack_path=$(echo "$findloop" | awk '{print $3}')
+    fi
 
     # Try to unmount the slack_path first
     if mountpoint -q "$slack_path"; then
@@ -379,16 +387,19 @@ unmount_slack() {
         umount -v "$slack_path"
     fi
 
-    # Detach loop devices associated with slack.img files
-    if [ -f "$mounted_path/slack.img" ]; then
-        losetup --associated "$mounted_path/slack.img" | while IFS=: read -r loop_device rest; do
-            if [ -b "$loop_device" ]; then
-                echo "detaching $loop_device from $mounted_path/slack.img.." >&2
-                losetup -d "$loop_device"
-            fi
-        done
-    fi
+    # Detach ALL loop devices associated with slack.img files
+    losetup -a | grep "slack.img" | cut -d: -f1 | while read loop_device; do
+        if [ -b "$loop_device" ]; then
+            echo "detaching $loop_device.." >&2
+            losetup -d "$loop_device"
+        fi
+    done
 }
+
+
+
+
+
 
 
 
