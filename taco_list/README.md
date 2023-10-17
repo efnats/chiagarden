@@ -18,6 +18,7 @@ or
 - `--label`: Specify the label of the disks to be used. If both, mount-dir or label are ommited, this is the default with CHIA
 - `--subdir`: (Optional) Specify a subdirectory inside each disk. Default is an empty string.
 - `--separator`: (Optional) Specify the output separator for the list of destination directories. Available options are `newline`(default), `space` and `csv`.
+- `--quotes`: (Optional) put each drives output in quotes
 - `--command`: (Optional) Secify the command which will be put ahead of the listed drives. For example "/usr/local/bin/plot_sink --". Default: echo -e
 
 ## Example

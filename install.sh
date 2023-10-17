@@ -42,6 +42,7 @@ files_to_copy=(
   "./plotting/plot_mover"
   "./plotting/plot_over"
   "./plotting/plot_starter"
+  "./plotting/plotsink.sh"
   "./taco_list/taco_list"
 )
 

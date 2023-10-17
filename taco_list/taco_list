@@ -12,9 +12,9 @@ RESET="\033[0m"
 
 print_usage() {
     echo "Usage:"
-    echo "./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--separator space|newline|csv] [--command '/path/to/command --']"
+    echo "./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--separator space|newline|csv] [--quotes] [--command '/path/to/command --']"
     echo "or"
-    echo "./taco_list --label CHIA [--subdir subdir_name] [--separator space|newline|csv] [--command '/path/to/command --']"
+    echo "./taco_list --label CHIA [--subdir subdir_name] [--separator space|newline|csv] [--quotes] [--command '/path/to/command --']"
 }
 
 while [[ "$#" -gt 0 ]]; do
@@ -39,6 +39,10 @@ while [[ "$#" -gt 0 ]]; do
             default_command="$2"
             shift 2
             ;;
+        --quotes)
+            use_quotes=true
+            shift
+            ;;
         *)
             echo "Unknown argument: $1"
             print_usage
@@ -57,18 +61,34 @@ if [ -n "$mount_dir" ] && [ -n "$label" ]; then
     exit 1
 fi
 
-# Default separator to 'newline' if not specified
-[ -z "$separator" ] && separator="newline"
+
+get_disks_from_mount() {
+    find "$1" -mindepth 1 -maxdepth 1 -type d | sed "s|$|/$2|"
+}
+
+get_disks_from_label() {
+    df -h | grep -E "^/dev/.*$1" | awk -v s="$2" '{print $6"/"s}'
+}
+
+add_quotes() {
+    echo "$1" | awk '{print "\"" $0 "\""}'
+}
 
 if [ -n "$mount_dir" ]; then
-    dest_disks=$(find "$mount_dir" -mindepth 1 -maxdepth 1 -type d | sed "s|$|/$subdir|")
+    dest_disks=$(get_disks_from_mount "$mount_dir" "$subdir")
 elif [ -n "$label" ]; then
-    dest_disks=$(df -h | grep -E "^/dev/.*$label" | awk -v s="$subdir" '{print $6"/"s}')
+    dest_disks=$(get_disks_from_label "$label" "$subdir")
     if [ -z "$dest_disks" ]; then
         echo -e "${RED}Error: No disks found with label $label.${RESET}"
         exit 1
     fi
 fi
+
+[ "$use_quotes" == "true" ] && dest_disks=$(add_quotes "$dest_disks")
+
+
+# Default separator to 'newline' if not specified
+[ -z "$separator" ] && separator="newline"
 
 case $separator in
     "space")

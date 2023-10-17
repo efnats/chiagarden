@@ -3,7 +3,7 @@ Description=PlotSink Service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/taco_list --seperator space --subdir gigahorse/ --command "/usr/local/bin/chia_plot_sink --"
+ExecStart=/usr/local/bin/plotsink.sh
 Restart=always
 RestartSec=10
 StandardOutput=file:/var/log/plotsink.log
