@@ -42,7 +42,6 @@ files_to_copy=(
   "./plotting/plot_mover"
   "./plotting/plot_over"
   "./plotting/plot_starter"
-  "./plotting/plotsink.sh"
   "./taco_list/taco_list"
 )
 
@@ -55,6 +54,34 @@ for file in "${files_to_copy[@]}"; do
     exit 1
   fi
 done
+echo
+
+# Function to download and set permissions (needed for plot_starter)
+download_and_set_permissions() {
+    local file_url="$1"
+    local file_name="$2"
+
+    if [[ ! -e /usr/local/bin/$file_name ]]; then
+        echo -e "${YELLOW}${file_name} not found. Downloading the latest version from GitHub...${NC}"
+
+        # Download the file directly using the provided URL
+        curl -L -o "/usr/local/bin/${file_name}" "$file_url"
+
+        # After downloading, give execute permissions
+        chmod +x "/usr/local/bin/${file_name}"
+
+        echo -e "${GREEN}${file_name} downloaded and saved to /usr/local/bin/${NC}"
+    else
+        echo -e "${GREEN}${file_name} already exists in /usr/local/bin/${NC}"
+    fi
+}
+
+echo -e "${YELLOW}Downloading from https://github.com/madMAx43v3r. Required for plot_starter...${NC}"
+# Direct URL and file names
+download_and_set_permissions "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/cuda-plotter/linux/x86_64/cuda_plot_k32" "cuda_plot_k32"
+download_and_set_permissions "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_copy" "chia_plot_copy"
+download_and_set_permissions "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_sink" "chia_plot_sink"
+
 
 # Copy the systemd services
 if [[ -e "gardenmount/garden-mount.service" ]]; then

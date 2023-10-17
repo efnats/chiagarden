@@ -12,9 +12,9 @@ RESET="\033[0m"
 
 print_usage() {
     echo "Usage:"
-    echo "./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--format oneline|newline|csv]"
+    echo "./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--separator space|newline|csv] [--command '/path/to/command --']"
     echo "or"
-    echo "./taco_list --label CHIA [--subdir subdir_name] [--format oneline|newline|csv]"
+    echo "./taco_list --label CHIA [--subdir subdir_name] [--separator space|newline|csv] [--command '/path/to/command --']"
 }
 
 while [[ "$#" -gt 0 ]]; do
@@ -31,8 +31,12 @@ while [[ "$#" -gt 0 ]]; do
             subdir="$2"
             shift 2
             ;;
-        --format)
-            format="$2"
+        --separator)
+            separator="$2"
+            shift 2
+            ;;
+        --command)
+            default_command="$2"
             shift 2
             ;;
         *)
@@ -44,9 +48,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if [ -z "$mount_dir" ] && [ -z "$label" ]; then
-    echo -e "${RED}Please provide either --mount-dir or --label.${RESET}"
-    print_usage
-    exit 1
+    label="CHIA"
 fi
 
 if [ -n "$mount_dir" ] && [ -n "$label" ]; then
@@ -55,8 +57,8 @@ if [ -n "$mount_dir" ] && [ -n "$label" ]; then
     exit 1
 fi
 
-# Default format to 'newline' if not specified
-[ -z "$format" ] && format="newline"
+# Default separator to 'newline' if not specified
+[ -z "$separator" ] && separator="newline"
 
 if [ -n "$mount_dir" ]; then
     dest_disks=$(find "$mount_dir" -mindepth 1 -maxdepth 1 -type d | sed "s|$|/$subdir|")
@@ -68,16 +70,21 @@ elif [ -n "$label" ]; then
     fi
 fi
 
-case $format in
-    "oneline")
-        dest_disks=$($default_command "$dest_disks" | tr '\n' ' ')
+case $separator in
+    "space")
+        dest_disks=$(echo "$dest_disks" | tr '\n' ' ')
         ;;
     "csv")
-        dest_disks=$($default_command "$dest_disks" | tr '\n' ',' | sed 's/,$//')
+        dest_disks=$(echo "$dest_disks" | tr '\n' ',' | sed 's/,$//')
         ;;
     *)
-        # Treat any unrecognized format as newline
+        # Treat any unrecognized separator as newline
         ;;
 esac
+
+# Be verbose about the command unless it's the default
+if [[ "$default_command" != "echo -e" ]]; then
+    echo -e "${CYAN}\nExecuting command: \n$default_command $dest_disks\n${RESET}"
+fi
 
 $default_command "$dest_disks"

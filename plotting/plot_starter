@@ -1,19 +1,26 @@
 #!/bin/bash
 
-profile="plot_starter.profile" # Set the default profile variable
+# Add color variables and bold
+GREEN="\033[32m"
+YELLOW="\033[33m"
+CYAN="\033[36m"
+RED="\033[31m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+initialize_parameters() {
+# Set the default config variable
+config="plot_starter.config" 
 
 
-# Default settings for profile
-# These values will be overwritten if a profile is loaded with the same variables set
+# Default settings for config
+# These values will be overwritten if a config is loaded with the same variables set
 farmerkey="your_farmer_key"
 contract="pool_contract_address"
-
 plotamount=-1
 compression=5
-
 plotting_dir="/mnt/plotting" # your temporary plotting dir (-t in cuda_plot_k32)
 dest_dir=192.168.31.33 # set to a destination dir or a host where plotsink is running
-
 plotterbin="/usr/local/bin/cuda_plot_k32"
 chia_plot_copy_bin="/usr/local/bin/chia_plot_copy"
 
@@ -25,23 +32,9 @@ max_reboots=2           # Number of reboots
 lastminutes=120         # Time window in minutes
 cooldowntime=15         # Wait time in minutes
 
-
-
-# Add color variables and bold
-GREEN="\033[32m"
-YELLOW="\033[33m"
-CYAN="\033[36m"
-RED="\033[31m"
-BOLD="\033[1m"
-RESET="\033[0m"
-
-
-is_mountpoint() {
-    mountpoint -q "$1"
-}
-
 # Initialize the guru_meditation variable
 guru_meditation=false
+}
 
 
 # Add help text
@@ -49,25 +42,25 @@ help_text() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  --profile FILE           Load a custom profile from the specified file."
+    echo "  --config FILE           Load a custom config from the specified file."
     echo "  --guru-meditation        Execute the sleep command with the cooldowntime"
     echo "                           if the number of reboots exceeds the limit."
     echo "  --help                   Display this help message and exit."
     echo ""
     echo "This script starts the plotting process for Chia."
-    echo "It includes various features such as loading profiles, managing plot files,"
+    echo "It includes various features such as loading configs, managing plot files,"
     echo "and controlling the reboot count. The script also checks if the plotting"
     echo "directory is mounted, and mounts it if necessary. It removes temporary"
     echo "files that are no longer in use and copies finished *.plot files before start"
     echo "given parameters."
 }
 
-
-# Check for the --profile, --help, and --guru-meditation arguments
+parse_arguments() {
+# Check for the --config, --help, and --guru-meditation arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --profile)
-        profile="$2"
+        --config)
+        config="$2"
         shift 2
         ;;
         --help)
@@ -84,57 +77,49 @@ while [[ $# -gt 0 ]]; do
         ;;
     esac
 done
+}
 
-
-# Function to load profile from a file
-load_profile() {
+# Function to load config from a file
+load_config() {
+    local config_path="$1"
     if [ -f "$1" ]; then
         source "$1"
     else
-        echo "Profile not found: $1"
+        echo "config not found: $1"
         return 1
     fi
 }
 
 
-# Load profile from the specified file or default locations
-if [[ "$profile" != /* ]]; then
-    if [ -f "./$profile" ]; then
-        load_profile "./$profile"
-    elif [ -f "/etc/chiagarden/$profile" ]; then
-        load_profile "/etc/chiagarden/$profile"
-    elif [ -f "$HOME/.config/chiagarden/$profile" ]; then
-        load_profile "$HOME/.config/chiagarden/$profile"
-    else
-        echo "Profile not found in default directories: $profile"
-        exit 1
+# Check if the specified directory is mounted, if not mount it
+check_and_mount_dir() {
+    local dir="$1"
+    if ! mountpoint -q "$dir"; then
+        echo -e "${CYAN}Mounting $dir using /etc/fstab configuration...${RESET}"
+        mount "$dir"
     fi
-else
-    load_profile "$profile"
-fi
+}
 
 
-
-# Check if the destination directory is mounted
-if ! is_mountpoint "${plotting_dir}"; then
-    echo -e "${CYAN}Mounting ${plotting_dir} using /etc/fstab configuration...${RESET}"
-    mount "${plotting_dir}"
-fi
-
-while true; do
-    # Check if there are any *.plot files in the plotting directory
-    if plot_files=$(ls "${plotting_dir}"/*.plot 2>/dev/null); then
+# Manage plot files: Copy *.plot files and remove unused *.tmp files
+manage_plot_files() {
+    local plot_dir="$1"
+    local dest_dir="$2"
+    local plot_files
+    
+    # Check for and copy *.plot files to the destination
+    if plot_files=$(ls "${plot_dir}"/*.plot 2>/dev/null); then
         if [ -f "$chia_plot_copy_bin" ]; then
-            $chia_plot_copy_bin -d -t $dest_dir -- $plotting_dir/*.plot
+            $chia_plot_copy_bin -d -t $dest_dir -- $plot_dir/*.plot
         else
             echo -e "${YELLOW}Warning: chia_plot_copy not found at $chia_plot_copy_bin${RESET}"
             echo "Please download chia_plot_copy from https://github.com/madMAx43v3r/chia-gigahorse"
             echo "Skipping moving of plot files"
-            break
         fi
     fi
-    # Remove all *.tmp files not being modified anymore
-    for tmp_file in "${plotting_dir}"/*.tmp; do
+    
+    # Remove unused *.tmp files
+    for tmp_file in "${plot_dir}"/*.tmp; do
         if [ ! -e "$tmp_file" ]; then
             continue
         fi
@@ -145,28 +130,56 @@ while true; do
         fi
     done
 
+    # If no plot files were found, this function ends here
     if [ -z "$plot_files" ]; then
-        # If there are no *.plot files, break out of the loop
-        break
+        return
     fi
 
     sleep 1
-done
-
-# Calculate the time window's starting point (y minutes ago)
-start_time=$(date -d "-$lastminutes minutes" +"%Y-%m-%d %H:%M:%S")
-
-# Count the number of reboots in the time window
-reboot_count=$(journalctl --since="$start_time" -o json | grep -o '"_BOOT_ID":"[^"]*' | sed 's/"_BOOT_ID":"//g' | sort -u | wc -l)
+}
 
 
-# If the number of reboots exceeds the limit and --guru-meditation is issued, wait for z minutes before proceeding
-if [ "$reboot_count" -gt "$max_reboots" ] && [ "$guru_meditation" = true ]; then
-    echo "System has rebooted or crashed $reboot_count in the last $max_reboots minutes. Delaying startup by $cooldowntime" minutes
-    sleep $((cooldowntime * 60))
-else
-    echo "No need to delay"
-fi
-# After the loop is done, start the plotter-script
-echo "Starting up..."
-$plotterbin -n $plotamount -C $compression -t $plotting_dir/ -d @$dest_dir -f $farmerkey -c $contract
+# Implement guru meditation functionality
+apply_guru_meditation() {
+    local last_minutes="$1"
+    local max_reboots="$2"
+    local cooldown_time="$3"
+    local guru_flag="$4"
+
+    # Calculate the time window's starting point (y minutes ago)
+    local start_time=$(date -d "-$last_minutes minutes" +"%Y-%m-%d %H:%M:%S")
+
+    # Count the number of reboots in the time window
+    local reboot_count=$(journalctl --since="$start_time" -o json | grep -o '"_BOOT_ID":"[^"]*' | sed 's/"_BOOT_ID":"//g' | sort -u | wc -l)
+
+    # If the number of reboots exceeds the limit and --guru-meditation is issued, wait for z minutes before proceeding
+    if [ "$reboot_count" -gt "$max_reboots" ] && [ "$guru_flag" = true ]; then
+        echo "System has rebooted or crashed $reboot_count times in the last $last_minutes minutes. Delaying startup by $cooldown_time minutes."
+        sleep $((cooldown_time * 60))
+    else
+        echo "No need to delay."
+    fi
+}
+
+# Start the Chia plotter
+start_plotter() {
+    echo "Starting up..."
+    $plotterbin -n $plotamount -C $compression -t $plotting_dir/ -d @$dest_dir -f $farmerkey -c $contract
+}
+
+
+# Main execution
+main() {
+    initialize_parameters
+    parse_arguments "$@"
+    load_config "$config"
+    check_and_mount_dir "${plotting_dir}"
+    manage_plot_files "${plotting_dir}" "$dest_dir"
+    apply_guru_meditation "$lastminutes" "$max_reboots" "$cooldowntime" "$guru_meditation"
+    start_plotter
+}
+
+
+# Call main function with all script arguments
+main "$@"
+
