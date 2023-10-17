@@ -1,7 +1,6 @@
 #!/bin/bash
 
 btrfs_mounted_loop=""
-
 # Default max size for slack in bytes (110GB)
 max_size=$((110 * 1024 * 1024 * 1024))
 
@@ -135,7 +134,6 @@ mount_disk() {
     fi
 
     local device=$(readlink -f "$disk")
-    found_disks=$((found_disks + 1))
     local disk_mount_point="$mount_point/$(basename "$disk")"
     mkdir -p "$disk_mount_point"
     mount -v -o "$mount_options" "$device" "$disk_mount_point" && mounted_devices+=("$device")
@@ -301,7 +299,6 @@ mount_mergerfs() {
 
 
 mount_action() {
-
     # Unmount first to ensure we don't have any conflicts
     echo
     echo -e "${YELLOW}Unmounting disks to prevent conflicts..${RESET}"
@@ -310,7 +307,10 @@ mount_action() {
     # Mount all the disks
     echo
     echo -e "${YELLOW}Mounting disks..${RESET}"
+
+    found_disks=0
     while IFS= read -r disk; do
+        found_disks=$((found_disks + 1))
         mount_disk "$disk"
     done < <(find /dev/disk/by-label -name "$label_pattern")
 
@@ -421,6 +421,7 @@ unmount_cleanup() {
 
 
 unmount_action() {
+    found_disks=0
     # First, unmount the slack images
     echo
     echo -e "${YELLOW}Unmounting slack images..${RESET}"
@@ -537,7 +538,6 @@ while [ "$#" -gt 0 ]; do
 done
 
 
-found_disks=0
 username=$(whoami)
 mounted_devices=()
 
