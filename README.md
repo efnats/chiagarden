@@ -8,6 +8,7 @@ And if you've already given out creative disk labels (Heinz, Hans and Franz, I g
 Most of the ChiaGarden tools offer you a choice between two operating modes:
 
 `--label` search and process plots based on disk labels.
+
 `--mount-dir` search and process plots based on mount points.
 
 As long as your disks are mounted to the same mount point consistently, there's no distinction.
