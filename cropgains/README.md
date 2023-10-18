@@ -19,8 +19,14 @@ cropgains is a tool designed to help you monitor and report the profitability of
    ```git clone [https://github.com/efnats/chiagarden.git]```
 2. Navigate to the repository directory:
    ```cd chiagarden/cropgains```
-3. Install the necessary libraries:
-   ```pip install -r requirements.txt```
+3. Edit cropgains.cfg (enter wallet address and electrictiy price) and copy to /etc/chiagarden:
+   ```nano ./cropgains.cfg```
+   ```cp ./cropgains.cfg /etc/chiagarden/```
+4. install requirements
+   ```pip install colorama```
+   ```pip install requests```
+or
+run install.sh from the main directory
 
 ### Configuration
 To correctly retrieve energy consumption details and calculate costs, you must configure the `cropgains.cfg` file. The configuration file has multiple sections:
