@@ -30,7 +30,7 @@ As long as your disks are mounted to the same mount point consistently, there's 
 
 ## cropgains
 
-[cropgains](cropgains](https://github.com/efnats/chiagarden/tree/main/cropgains) is a profitability monitoring tool for your Chia farming operation providing infos about revenue, cost and profit. It supports automatically extracting energy consumption info from tasmota devices.
+[cropgains](https://github.com/efnats/chiagarden/tree/main/cropgains) is a profitability monitoring tool for your Chia farming operation providing infos about revenue, cost and profit. It supports automatically extracting energy consumption info from tasmota devices.
 
 ## machinaris
 
