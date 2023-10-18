@@ -3,10 +3,13 @@
 ChiaGarden is a collection of sysprep tools designed to build, manage, and maintain a PoST (Proof of Space and Time) farm on a linux based system. These tools make it easy to prepare and mount your hard disks, manage and monitor your plots for your farm.
 
 If you agree that typing disk paths is a job you shouldn't be doing, then this is for you. If you are already plotted and have no intention of reformatting anything, do read on: ChiaGarden will let you uniquely label drives with a certain pattern (for example CHIA-[SERIALNR]) which then which then facilitates subsequent processing.
+
 And if you've already given out creative disk labels (Heinz, Hans and Franz, I guess) or if you think that changing disk labels may be destroying your plots (although that is not the case) here is good news, too
 Most of the ChiaGarden tools offer you a choice between two operating modes:
+
 `--label` search and process plots based on disk labels.
 `--mount-dir` search and process plots based on mount points.
+
 As long as your disks are mounted to the same mount point consistently, there's no distinction.
 
 ## chiainit
