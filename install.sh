@@ -31,13 +31,29 @@ fi
 # Update package list and install dependencies
 echo -e "\n${YELLOW}Updating package list and installing dependencies...${NC}"
 apt update
-apt install -y mergerfs xfsprogs ntfs-3g smartmontools parted
+apt install -y mergerfs xfsprogs ntfs-3g smartmontools parted python3 python3-pip
+
+# Install necessary Python packages using pip3
+echo -e "${YELLOW}Installing required Python packages...${NC}"
+pip3 install colorama
+pip3 install requests
+
+# Create /etc/chiagarden directory if it doesn't exist
+if [[ ! -d /etc/chiagarden ]]; then
+    echo -e "${YELLOW}Creating /etc/chiagarden directory...${NC}"
+    mkdir /etc/chiagarden
+    echo -e "${GREEN}/etc/chiagarden directory created.${NC}"
+else
+    echo -e "${GREEN}/etc/chiagarden directory already exists.${NC}"
+fi
+
 
 # Copy files
 echo -e "\n${YELLOW}Copying ChiaGarden files...${NC}"
 files_to_copy=(
   "./chiainit/chiainit"
   "./gardenmount/gardenmount"
+  "./cropgains/cropgains"
   "./plotting/plot_counter"
   "./plotting/plot_mover"
   "./plotting/plot_over"

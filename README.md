@@ -1,17 +1,17 @@
 # ChiaGarden
 
-ChiaGarden is a collection of tools designed to help you build, manage, and maintain a PoST (Proof of Space and Time) farm on a linux based system. These tools make it easy to prepare and mount your hard disks, and manage your plots for your farm.
+ChiaGarden is a collection of sysprep tools designed to build, manage, and maintain a PoST (Proof of Space and Time) farm on a linux based system. These tools make it easy to prepare and mount your hard disks, manage and monitor your plots for your farm.
 
-If you agree that typing disk paths is a job you shouldn't be doing, then this is for you. chiagarden lets you uniquely label drives with a certain pattern (for example CHIA-[SERIALNR]) which then makes it very easy for later processing.
-
-With that said, you don't have to (re)label your drives in order for these tools to function. Most of the tools in the repo let you chose between two operatin modes:
-`--label` lets you search and process plots based on disks labelled.
-`--mount-dir` lets you search and process plots based on mountpoints.
-As long as your disks are mounted to the same mountpoint exclusively, there is absolutely no difference.
+If you agree that typing disk paths is a job you shouldn't be doing, then this is for you. If you are already plotted and have no intention of reformatting anything, do read on: ChiaGarden will let you uniquely label drives with a certain pattern (for example CHIA-[SERIALNR]) which then which then facilitates subsequent processing.
+And if you've already given out creative disk labels (Heinz, Hans and Franz, I guess) or if you think that changing disk labels may be destroying your plots (although that is not the case) here is good news, too
+Most of the ChiaGarden tools offer you a choice between two operating modes:
+`--label` search and process plots based on disk labels.
+`--mount-dir` search and process plots based on mount points.
+As long as your disks are mounted to the same mount point consistently, there's no distinction.
 
 ## chiainit
 
-[chiainit](https://github.com/efnats/chiagarden/tree/main/chiainit) is a bash script that helps you prepare and manage hard drives for PoST farming. It automates the process of wiping, formatting, and labeling multiple drives at once, making it easy to set up and maintain your Chia farming storage.
+[chiainit](https://github.com/efnats/chiagarden/tree/main/chiainit) is a bash script for preparing hard drives for PoST farming. It automates the process of formatting and labeling multiple drives at once.
 
 ## gardenmount
 
@@ -24,6 +24,10 @@ As long as your disks are mounted to the same mountpoint exclusively, there is a
 ## taco_list
 
 [taco_list](https://github.com/efnats/chiagarden/tree/main/taco_list) is a simple wrapper script to list your destination disks and execute any command with the given parameters - for example chia_plot_sink
+
+## cropgains
+
+[cropgains](cropgains](https://github.com/efnats/chiagarden/tree/main/cropgains) is a profitability monitoring tool for your Chia farming operation providing infos about revenue, cost and profit. It supports automatically extracting energy consumption info from tasmota devices.
 
 ## machinaris
 

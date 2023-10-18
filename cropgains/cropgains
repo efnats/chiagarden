@@ -1,0 +1,244 @@
+import requests
+import time
+import configparser
+import os
+from datetime import datetime
+from colorama import init, Fore, Style
+
+
+# Initialize colorama
+init(autoreset=True)
+
+# Read the configuration file
+config = configparser.ConfigParser()
+config.read('cropgains.cfg')
+
+# Potential paths for the config file
+config_paths = [
+    "/etc/chiagarden/cropgains.cfg",
+    os.path.expanduser("~/.config/chiagarden/cropgains.cfg")
+]
+
+# Read the first available config file
+config_loaded = False
+for path in config_paths:
+    if os.path.exists(path):
+        config.read(path)
+        config_loaded = True
+        break
+
+if not config_loaded:
+    print(Fore.RED + "Config file cropgains.cfg not found in any of the specified paths /etc/chiagarden ~/chiagarden/ or ./!")
+    exit(1)
+
+
+# Get values from the configuration file
+wallet_address = config['DEFAULT']['WALLET_ADDRESS']
+electricity_price_usd = float(config.get('DEFAULT', 'ELECTRICITY_PRICE_USD'))
+
+def compute_electricity_cost_in_usd(kWh):
+    return kWh * electricity_price_usd
+
+def compute_power_draw(energy_yesterday_kWh):
+    return (energy_yesterday_kWh / 24) * 1000  # Convert kWh to watts and divide by 24 hours
+
+
+def print_energy_table(energy_totals, energy_yesterdays, power_draws, total_cost, yesterday_cost):
+
+    print(Fore.MAGENTA + "ENERGY CONSUMPTION AND COST")
+    
+    headers = ["Device", "Total", "24hr", "Power(W)"]  # Add "Power(W)" column
+    device_max_length = max([len(device) for device in energy_totals.keys()] + [len(headers[0])])
+    total_max_length = max([len(f"{total:.2f}") for total in energy_totals.values()] + [len(headers[1])])
+    yesterday_max_length = max([len(f"{yesterday:.2f}") for yesterday in energy_yesterdays.values()] + [len(headers[2])])
+    power_max_length = max([len(f"{power:.2f}") for power in power_draws.values()] + [len(headers[3])])  # Compute max length for power
+
+    column_widths = [device_max_length, total_max_length, yesterday_max_length, power_max_length]  # Include power_max_length
+
+    def print_row(items, widths):
+        print("  ".join(str(item).ljust(widths[i]) for i, item in enumerate(items)))
+
+    print_row(headers, column_widths)
+    print_row(['-' * w for w in column_widths], column_widths)
+
+    for device, total in energy_totals.items():
+        yesterday = energy_yesterdays.get(device, 0)
+        power = power_draws.get(device, 0)  # Fetch computed power for the device
+        print_row([device, f"{total:.2f}", f"{yesterday:.2f}", f"{power:.2f}"], column_widths)  # Print power to the row
+
+
+    print_row(['-' * w for w in column_widths], column_widths)
+    print_row(["SUM (kWh)", f"{sum(energy_totals.values()):.2f}", f"{sum(energy_yesterdays.values()):.2f}", f"{total_power_draw:.2f}"], column_widths)
+    print_row(["COST (USD)", f"${total_cost:.2f}", f"${yesterday_cost:.2f}", "-"], column_widths)  # No cost for power
+    print()
+
+
+def get_chia_received():
+    current_time = int(time.time())
+    time_24_hours_ago = current_time - 86400
+    time_7_days_ago = current_time - 604800
+    time_30_days_ago = current_time - 2592000
+
+    url = f"https://xchscan.com/api/account/txns?address={wallet_address}"
+    response = requests.get(url)
+    data = response.json()
+
+    total_received_24_hours = 0
+    total_received_7_days = 0
+    total_received_30_days = 0
+
+    for txn in data['txns']:
+        if txn['to'] == wallet_address:
+            txn_amount = txn['amount'] / 1000000000000
+            if txn['timestamp'] > time_24_hours_ago:
+                total_received_24_hours += txn_amount
+            if txn['timestamp'] > time_7_days_ago:
+                total_received_7_days += txn_amount
+            if txn['timestamp'] > time_30_days_ago:
+                total_received_30_days += txn_amount
+
+    return total_received_24_hours, total_received_7_days, total_received_30_days
+
+
+
+def get_energy_details(ip_address):
+    url = f"http://{ip_address}/cm?cmnd=Status%208"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        energy_total = data.get('StatusSNS', {}).get('ENERGY', {}).get('Total')
+        energy_yesterday = data.get('StatusSNS', {}).get('ENERGY', {}).get('Yesterday')
+        
+        if energy_total is not None and energy_yesterday is not None:
+            return energy_total, energy_yesterday
+        else:
+            raise ValueError("Energy details not found in the response.")
+    except requests.RequestException as e:
+        print(f"Failed to fetch data from {ip_address}. Error: {e}")
+        return None, None
+
+def get_chia_price():
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=chia&vs_currencies=usd"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return data["chia"]["usd"]
+    except requests.RequestException as e:
+        print(f"Failed to fetch Chia price. Error: {e}")
+        return None
+    
+def print_table(headers, rows):
+    """
+    Print a table with given headers and rows.
+    """
+    # Get the max width for each column
+    column_widths = [max(len(str(value)) for value in col) for col in zip(headers, *rows)]
+
+    # Helper function to print a row with separator
+    def print_row(items, widths):
+        print("  ".join(str(item).ljust(widths[i]) for i, item in enumerate(items)))
+
+    # Print header with separators
+    print_row(headers, column_widths)
+    print_row(['-' * w for w in column_widths], column_widths)
+
+    # Print each row
+    for row in rows:
+        print_row(row, column_widths)
+
+    print()  # Extra newline for better output spacing
+
+if __name__ == "__main__":
+    received_24h, received_7d, received_30d = get_chia_received()
+    xch_price = get_chia_price()
+
+    reward_24h_usd = received_24h * xch_price
+    reward_7d_usd = received_7d * xch_price
+    reward_30d_usd = received_30d * xch_price
+
+    print()
+    print(Fore.YELLOW + "=" * 40)
+    print(Fore.YELLOW + "CHIA PROFIT & ENERGY COST REPORT".center(40))
+    print(Fore.YELLOW + "=" * 40)
+
+    print(Fore.CYAN + f"\nDate: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    print(Fore.CYAN + f"Price XCH: ${xch_price:.2f} USD")
+    print(Fore.CYAN + f"Wallet Address: {wallet_address}")
+    print(Fore.CYAN + f"Electricity price [USD/kWh]: ${electricity_price_usd:.2f}\n")
+
+    # Table for XCH and USD
+    print(Fore.MAGENTA + "REWARDS")
+
+    table_header = ["Period", "XCH", "USD"]
+    table_rows = [
+        ["24 hours", f"{received_24h:.3f}", f"${reward_24h_usd:.2f}"],
+        ["07 days", f"{received_7d:.3f}", f"${reward_7d_usd:.2f}"],
+        ["30 days", f"{received_30d:.3f}", f"${reward_30d_usd:.2f}"]
+    ]
+    print_table(table_header, table_rows)
+
+    #devices = {k:v for k, v in config['DEVICES'].items() if not config.has_option('DEFAULT', k)}
+    #devices_ip = {k:v for k, v in config['DEVICES_IP'].items() if not config.has_option('DEFAULT', k)}
+    devices_ip = {k: v for k, v in config['DEVICES_IP'].items() if not config.has_option('DEFAULT', k)}
+    devices_power_draw = {k: float(v) for k, v in config['DEVICES_POWER_DRAW'].items() if not config.has_option('DEFAULT', k)}
+
+    total_energy = 0
+    total_energy_yesterday = 0
+    total_power_draw = 0  # Initialize total power draw
+    energy_totals = {}
+    energy_yesterdays = {}
+    power_draws = {}
+    
+    # for name, ip in devices_ip.items():
+    #     energy_total, energy_yesterday = get_energy_details(ip)
+    #     if energy_total is not None:
+    #         total_energy += energy_total
+    #         energy_totals[name] = energy_total
+    #     if energy_yesterday is not None:
+    #         total_energy_yesterday += energy_yesterday
+    #         energy_yesterdays[name] = energy_yesterday
+    #         power_draw = compute_power_draw(energy_yesterday)  # Compute power draw
+    #         power_draws[name] = power_draw
+    #         total_power_draw += power_draw  # Aggregate the power draw
+
+    all_devices = set(devices_ip.keys()).union(devices_power_draw.keys())
+
+    for name in all_devices:
+        energy_total = None
+        energy_yesterday = None
+        if name in devices_ip:
+            energy_total, energy_yesterday = get_energy_details(devices_ip[name])
+        if energy_yesterday is None and name in devices_power_draw:  # If IP retrieval fails or there's no IP
+            power_draw = devices_power_draw[name]  # Use static power draw
+            energy_yesterday = power_draw / 1000 * 24  # Convert to 24-hour energy consumption in kWh
+        if energy_total is not None or name in devices_power_draw:
+            if energy_total is None:  # For devices without IPs, we'll use a placeholder value for total
+                energy_total = energy_yesterday * 30  # Assuming 30 days in a month for simplification
+            total_energy += energy_total
+            energy_totals[name] = energy_total
+        if energy_yesterday is not None:
+            total_energy_yesterday += energy_yesterday
+            energy_yesterdays[name] = energy_yesterday
+            power_draw = compute_power_draw(energy_yesterday)  # Compute power draw
+            power_draws[name] = power_draw
+            total_power_draw += power_draw  # Aggregate the power draw
+
+    # Compute costs
+    total_cost = compute_electricity_cost_in_usd(total_energy)
+    yesterday_cost = compute_electricity_cost_in_usd(total_energy_yesterday)
+
+    # Print Energy Table
+    #print_energy_table(devices_ip, energy_totals, energy_yesterdays, power_draws, total_cost, yesterday_cost)
+    print_energy_table(energy_totals, energy_yesterdays, power_draws, total_cost, yesterday_cost)
+
+
+    profit_24h = reward_24h_usd - yesterday_cost
+
+    profit_color = Fore.GREEN if profit_24h > 0 else Fore.RED
+    print(Fore.MAGENTA + "PROFIT (Last 24hrs)")
+    print(profit_color + f"reward : ${reward_24h_usd:.2f}")
+    print(profit_color + f"  cost : ${yesterday_cost:.2f}")
+    print(Fore.CYAN + "=" * 15)
+    print(profit_color + f"profit : ${profit_24h:.2f}\n")
