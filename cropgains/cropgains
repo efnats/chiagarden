@@ -111,14 +111,21 @@ def get_energy_details(ip_address):
         data = response.json()
         energy_total = data.get('StatusSNS', {}).get('ENERGY', {}).get('Total')
         energy_yesterday = data.get('StatusSNS', {}).get('ENERGY', {}).get('Yesterday')
+        energy_today = data.get('StatusSNS', {}).get('ENERGY', {}).get('Today')  # Get EnergyToday
         
-        if energy_total is not None and energy_yesterday is not None:
-            return energy_total, energy_yesterday
+        if energy_total is not None and energy_yesterday is not None and energy_today is not None:
+            return energy_total, energy_yesterday, energy_today
         else:
             raise ValueError("Energy details not found in the response.")
     except requests.RequestException as e:
         print(f"Failed to fetch data from {ip_address}. Error: {e}")
-        return None, None
+        return None, None, None
+    
+def compute_last_24h_energy(energy_yesterday, energy_today):
+    current_hour = datetime.now().hour
+    today_proportion = (current_hour / 24) * energy_today
+    yesterday_proportion = ((24 - current_hour) / 24) * energy_yesterday
+    return today_proportion + yesterday_proportion
 
 def get_chia_price():
     url = "https://api.coingecko.com/api/v3/simple/price?ids=chia&vs_currencies=usd"
@@ -209,21 +216,23 @@ if __name__ == "__main__":
 
     for name in all_devices:
         energy_total = None
-        energy_yesterday = None
+        energy_last_24h = None  # This will store the last 24 hours energy usage
         if name in devices_ip:
-            energy_total, energy_yesterday = get_energy_details(devices_ip[name])
-        if energy_yesterday is None and name in devices_power_draw:  # If IP retrieval fails or there's no IP
+            energy_total, energy_yesterday, energy_today = get_energy_details(devices_ip[name])
+            if energy_yesterday is not None and energy_today is not None:
+                energy_last_24h = compute_last_24h_energy(energy_yesterday, energy_today)
+        if energy_last_24h is None and name in devices_power_draw:  # If IP retrieval fails or there's no IP
             power_draw = devices_power_draw[name]  # Use static power draw
-            energy_yesterday = power_draw / 1000 * 24  # Convert to 24-hour energy consumption in kWh
+            energy_last_24h = power_draw / 1000 * 24  # Convert to 24-hour energy consumption in kWh
         if energy_total is not None or name in devices_power_draw:
             if energy_total is None:  # For devices without IPs, we'll use a placeholder value for total
-                energy_total = energy_yesterday * 30  # Assuming 30 days in a month for simplification
+                energy_total = energy_last_24h * 30  # Assuming 30 days in a month for simplification
             total_energy += energy_total
             energy_totals[name] = energy_total
-        if energy_yesterday is not None:
-            total_energy_yesterday += energy_yesterday
-            energy_yesterdays[name] = energy_yesterday
-            power_draw = compute_power_draw(energy_yesterday)  # Compute power draw
+        if energy_last_24h is not None:
+            total_energy_yesterday += energy_last_24h  # Using total_energy_yesterday to store the last 24 hours energy
+            energy_yesterdays[name] = energy_last_24h  # Using energy_yesterdays to store the last 24 hours energy
+            power_draw = compute_power_draw(energy_last_24h)  # Compute power draw
             power_draws[name] = power_draw
             total_power_draw += power_draw  # Aggregate the power draw
 
