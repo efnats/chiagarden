@@ -1,4 +1,4 @@
-# MeadowGains: A Chia Profitability & Monitoring Solution
+# CropGains: A Chia Profitability & Monitoring Solution
 
 cropgains is a tool designed to help you monitor and report the profitability of your Chia mining farm. It calculates energy consumption, costs, and Chia rewards to provide you with a comprehensive understanding of your operation's net gains.
 
