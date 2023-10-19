@@ -39,11 +39,12 @@ To correctly retrieve energy consumption details and calculate costs, you must c
 3. **DEVICES_POWER_DRAW**: 
     - For devices without a Tasmota IP, define their names and power consumption in watts. E.g., `device_name = 150`.
 
-When a device is defined in both sections, the script prefers to retrieve data from the IP. If it fails, the static power draw from DEVICES_POWER_DRAW will be used. Run the script:
-```python3 ./cropgains```
+When a device is defined in both sections, the script prefers to retrieve data from the IP. If it fails, the static power draw from DEVICES_POWER_DRAW will be used.
 
 Finally, make sure to set correct timezones in yor tasmota device. Specifically, make sure that it matches the timezone of the machine that you're running this script from. Otherwise the calculation of the last 24hrs perios wil not be right. Refer to [https://tasmota.github.io/docs/Timezone-Table] for the tasmota timezone table.
 
+ Run the script:
+```python3 ./cropgains```
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
