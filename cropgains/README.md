@@ -23,13 +23,13 @@ cropgains is a tool designed to help you monitor and report the profitability of
    ```nano ./cropgains.cfg```
    ```cp ./cropgains.cfg /etc/chiagarden/```
 4. install requirements
+   ```apt install python3```
    ```pip install colorama```
    ```pip install requests```
-or
-run install.sh from the main directory
+6. OR simply run the installer ```install.sh``` from the main directory
 
 ### Configuration
-To correctly retrieve energy consumption details and calculate costs, you must configure the `cropgains.cfg` file. The configuration file has multiple sections:
+To correctly retrieve energy consumption details and calculate costs, you must configure the `cropgains.cfg` file and place it in ```/etc/chiagarden``` or ```~/.config/chiagarden/```. The configuration file has multiple sections:
 
 1. **DEFAULT**:
     - `WALLET_ADDRESS`: Your Chia wallet address.
@@ -40,10 +40,10 @@ To correctly retrieve energy consumption details and calculate costs, you must c
     - For devices without a Tasmota IP, define their names and power consumption in watts. E.g., `device_name = 150`.
 
 When a device is defined in both sections, the script prefers to retrieve data from the IP. If it fails, the static power draw from DEVICES_POWER_DRAW will be used. Run the script:
-```python3 cropgains.py```
+```python3 ./cropgains```
 
-4. **SET CORRECT TIMEZONE IN YOUR TASMOTA DEVICE**:
-    - Make sure that your timezone is set correctly in all of your tasmota plugs. Specifically, make sure that it matches the timezone of the machine that you're running this script from. Otherwise the calculation of the last 24hrs perios wil not be right. Refer to [https://tasmota.github.io/docs/Timezone-Table] for the tasmota timezone table.
+Finally, make sure to set correct timezones in yor tasmota device. Specifically, make sure that it matches the timezone of the machine that you're running this script from. Otherwise the calculation of the last 24hrs perios wil not be right. Refer to [https://tasmota.github.io/docs/Timezone-Table] for the tasmota timezone table.
+
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
