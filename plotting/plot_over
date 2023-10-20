@@ -162,24 +162,6 @@ function search_path_output() {
     echo ""
 }
 
-# # Count the number of disks and set skip_search=true if amount >= than desired disks
-#  function get_free_disks() {
-#   free_disks=()
-
-#   for disk in "${disks[@]}"; do
-#     free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
-#     if [ "$free_space" -ge "$min_free_space_bytes" ]; then
-#       free_disks+=("$disk")
-#     fi
-#   done
-
-#   if [ "${#free_disks[@]}" -ge "$amount_free_disks" ]; then
-#     enough_free_disks=true
-#   else
-#     enough_free_disks=false
-#   fi
-# }
-
 
 function get_free_disks() {
   free_disks=()
@@ -217,36 +199,6 @@ function display_free_disks_info() {
 }
 
 
-# function find_oldest_plot() {
-#   local level=$1
-#   oldest_file=""
-#   oldest_timestamp=$(date +%s)
-#   file_count=0
-
-#   for disk in "${disks[@]}"; do
-#     # Check if the level is within the range of 1 to 9, which corresponds to the special patterns
-#     if [[ "$level" -ge 1 && "$level" -le 9 ]]; then
-#       single_digit=$(($level))
-#       double_digit=$(printf "%02d" $level)
-#       find_output=$(find "$disk" -maxdepth "$search_depth" -type f \( -name "plot-k32-c${single_digit}-*.plot" -o -name "plot-k32-c${double_digit}-*.plot" \) -printf '%T@ %p\n' 2>/dev/null)
-#     else
-#       find_output=$(find "$disk" -maxdepth "$search_depth" -type f -name "${plot_patterns[$level]}" -printf '%T@ %p\n' 2>/dev/null)
-#     fi
-
-#     if [ -n "$find_output" ]; then
-#       while IFS= read -r line; do
-#         timestamp=$(echo "$line" | awk '{print $1}')
-#         file=$(echo "$line" | awk '{print $2}')
-
-#         if [ "$(echo "$timestamp < $oldest_timestamp" | bc)" -eq 1 ]; then
-#           oldest_timestamp=$timestamp
-#           oldest_file=$file
-#         fi
-#         file_count=$((file_count + 1))
-#       done <<< "$find_output"
-#     fi
-#   done
-# }
 
 
 function find_oldest_plot() {
