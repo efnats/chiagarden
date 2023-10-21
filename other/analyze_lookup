@@ -1,0 +1,28 @@
+#!/bin/bash
+
+## show average lookup times.
+## this is to find out the impact of mergerfs on lookup times.
+## as it looks so far: none ;)
+
+# Set the start_time and optionally the end_time
+start_time="2020-10-21T08:00:00"
+end_time= # Leave empty if no end_time is provided
+log_dir="/home/chia/docker/.machinaris-gigahorse/mainnet/log"
+
+# Extract lookup times between start_time and end_time (if provided) and compute the average from all debug log files
+avg_time=$(cat "$log_dir"/debug.log* | awk -v start_time="$start_time" -v end_time="$end_time" '
+  ($1$2 > start_time) && (end_time == "" || $1$2 < end_time) && /Found .* proofs/ {
+    time_index = match($0, /Time: ([0-9.]+) s/, arr);
+    if (time_index) {
+      sum += arr[1];
+      count++;
+    }
+  }
+  END {if (count > 0) print sum/count; else print "0"}
+')
+
+if [ -z "$end_time" ]; then
+  echo "Average lookup time after $start_time: $avg_time s"
+else
+  echo "Average lookup time between $start_time and $end_time: $avg_time s"
+fi
