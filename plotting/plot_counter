@@ -6,7 +6,7 @@
 
 interval=120 # Default rescan interval (in seconds)
 mount_dir=""
-label=""
+label="CHIA"
 maxdepth=20
 
 ##################################

@@ -21,6 +21,8 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
+label="CHIA"
+
 subdir="" # Default parameter for your first subdirectory for plots in Disk. This is set in the commandline now.
 # add support for Gigahoese 2.x and Bladebit
 plot_patterns=('plot-k32-202*.plot' 'SPECIAL_PATTERN_1' 'SPECIAL_PATTERN_2' 'SPECIAL_PATTERN_3' 'SPECIAL_PATTERN_4' 'SPECIAL_PATTERN_5' 'SPECIAL_PATTERN_6' 'SPECIAL_PATTERN_7' 'SPECIAL_PATTERN_8' 'SPECIAL_PATTERN_9' 'plot-k32-c10-*.plot' 'plot-k32-c11-*.plot' 'plot-k32-c12-*.plot' 'plot-k32-c13-*.plot' 'plot-k32-c14-*.plot' 'plot-k32-c15-*.plot' 'plot-k32-c16-*.plot' 'plot-k32-c17-*.plot' 'plot-k32-c18-*.plot' 'plot-k32-c19-*.plot' 'plot-k32-c20-*.plot')
