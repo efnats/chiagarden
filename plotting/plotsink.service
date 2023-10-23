@@ -1,5 +1,7 @@
 [Unit]
 Description=PlotSink Service
+After=garden-mount.service
+Wants=garden-mount.service
 
 [Service]
 Type=simple
