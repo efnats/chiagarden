@@ -27,18 +27,64 @@ if [[ "$response" =~ ^([nN][oO]|[nN])$ ]]; then
   exit 1
 fi
 
+apt update
+apt install -y curl lsb-release xfsprogs ntfs-3g smartmontools parted python3 python3-pip
+
+
+install_or_update_mergerfs() {
+    # Get the OS release name
+    os_release=$(lsb_release -cs)
+
+    # Determine CPU architecture
+    cpu_arch=$(uname -m)
+    if [ "$cpu_arch" == "x86_64" ]; then
+        cpu_arch="amd64"
+    fi
+
+    # Fetch the latest version from GitHub
+    latest_version=$(curl -s "https://api.github.com/repos/trapexit/mergerfs/releases/latest" | grep tag_name | cut -d '"' -f 4 | tr -d 'v')
+
+    # Create a URL based on detected OS release and CPU architecture
+    url="https://github.com/trapexit/mergerfs/releases/download/${latest_version}/mergerfs_${latest_version}.ubuntu-${os_release}_${cpu_arch}.deb"
+
+    # Download the .deb file
+    echo "Downloading mergerfs from $url..."
+    curl -L $url -o /tmp/mergerfs.deb
+
+    # Check if the download was successful
+    if [ $? -ne 0 ]; then
+        echo "Error downloading the .deb file from GitHub. Falling back to package maintainer's version."
+        sudo apt-get update
+        sudo apt-get install -y mergerfs
+        if [ $? -ne 0 ]; then
+            echo "Error installing mergerfs from the package repository. Exiting."
+            exit 1
+        fi
+    else
+        # Install the .deb file
+        echo "Installing mergerfs..."
+        sudo dpkg -i /tmp/mergerfs.deb
+        rm /tmp/mergerfs.deb
+    fi
+
+    echo "Installation or update completed."
+}
+
+# Install or update mergerfs
+echo -e "\n${YELLOW}Installing mergerfs...${NC}"
+install_or_update_mergerfs
 
 # Update package list and install dependencies
 echo -e "\n${YELLOW}Updating package list and installing dependencies...${NC}"
-apt update
-apt install -y mergerfs xfsprogs ntfs-3g smartmontools parted python3 python3-pip
+apt install -y $DEPENDENCIES
 
 # Install necessary Python packages using pip3
-echo -e "${YELLOW}Installing required Python packages...${NC}"
+echo -e "\n${YELLOW}Installing required Python packages...${NC}"
 pip3 install colorama
 pip3 install requests
 
 # Create /etc/chiagarden directory if it doesn't exist
+echo -e "\n${YELLOW}Checking for /etc/chiagarden directory...${NC}"
 if [[ ! -d /etc/chiagarden ]]; then
     echo -e "${YELLOW}Creating /etc/chiagarden directory...${NC}"
     mkdir /etc/chiagarden
@@ -74,6 +120,7 @@ done
 echo
 
 # Function to download and set permissions (needed for plot_starter)
+echo -e "${YELLOW}Downloading and setting permissions for plot_starter...${NC}"
 download_and_set_permissions() {
     local file_url="$1"
     local file_name="$2"
@@ -101,6 +148,7 @@ download_and_set_permissions "https://github.com/madMAx43v3r/chia-gigahorse/raw/
 
 
 # Copy the systemd services
+echo -e "\n${YELLOW}Copying systemd services...${NC}"
 if [[ -e "gardenmount/garden-mount.service" ]]; then
   echo -e "\n${YELLOW}Installing garden-mount.service${NC}"
   cp ./gardenmount/garden-mount.service /etc/systemd/system/
@@ -127,7 +175,6 @@ fi
 
 
 # Prompt user to enable the systemd service
-#echo -e "\n${YELLOW}The garden-mount.service is for automounting during boot.${NC}"
 echo
 read -p "Do you want to enable the garden-mount service? (Automount drives during boot) [Y/n] " enable_response
 if [[ ! "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
@@ -160,5 +207,3 @@ echo -e "${YELLOW}You may want to start by using chiainit to initialize your dri
 
 /usr/local/bin/chiainit --help
 echo
-
-
