@@ -161,4 +161,35 @@ The systemd services for plotsink and plotstarter are part of the installation r
    Start plotting process, read some variables (for example farmerkey and contract address) from /etc/chiagarden/myfarm.profile
    ```bash
    ./plot_starter --profile myfarm.profile --guru-meditation
-      ```
+   ```
+
+
+# plot_avg Plotting Time Calculation Script
+
+This script calculates the average creation time of Chia plots over a specified period by parsing the `plot-starter` logs.
+
+## Features
+
+- Calculate the average plot creation time for Chia plots.
+- Ability to specify the time frame for the logs to be considered.
+
+## Requirements
+
+The script is intended to be run on a system with the following:
+- A Unix-like operating system (Linux, macOS)
+- `journalctl` utility available (commonly available on systemd-based systems)
+- `bc` for arbitrary precision numeric processing
+
+# Usage
+
+To execute the script, you can simply run it from the command line. 
+# By default, the script calculates the average plot creation time for the last 30 minutes:
+```bash
+plot_avg
+```
+
+# To specify a different time frame, use the `--last` parameter followed by the number of minutes:
+```bash
+plot_avg --last=60
+```
+
