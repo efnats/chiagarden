@@ -18,7 +18,8 @@ config.read('cropgains.cfg')
 # Potential paths for the config file
 config_paths = [
     "/etc/chiagarden/cropgains.cfg",
-    os.path.expanduser("~/.config/chiagarden/cropgains.cfg")
+    os.path.expanduser("~/.config/chiagarden/cropgains.cfg"),
+    "cropgains.cfg"  # Add current working directory as a search path
 ]
 
 # Read the first available config file
@@ -137,7 +138,20 @@ def get_chia_price():
     except requests.RequestException as e:
         print(f"Failed to fetch Chia price. Error: {e}")
         return None
-    
+
+def get_chia_netspace():
+    url = "https://xchscan.com/api/netspace"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        netspace = float(data['netspace'])
+        return netspace
+    except requests.RequestException as e:
+        print(f"An error occurred while fetching Chia netspace: {e}")
+        return None
+
+
 def print_table(headers, rows):
     """
     Print a table with given headers and rows.
@@ -163,9 +177,32 @@ if __name__ == "__main__":
     received_24h, received_7d, received_30d = get_chia_received()
     xch_price = get_chia_price()
 
+    chia_netspace = get_chia_netspace()
+    if chia_netspace:
+        chia_netspace_EiB = chia_netspace / 1.153e+18  # Convert to EiB
+    
+    # Constants definitions
+    block_time = 18.75  # Average time for a block in seconds
+    blocks_per_day = 86400 / block_time  # Number of blocks found per day
+    block_reward = 2  # XCH reward per block
+    farmers_reward_xch = blocks_per_day * block_reward  # Total XCH rewarded to farmers per day
+    farmers_reward_usd = farmers_reward_xch * xch_price  # Total USD value of XCH rewarded to farmers per day
+    uncompressed_plot_size_GiB = 101.3  # Size of an uncompressed plot in GiB
+    uncompressed_plot_size_TiB = uncompressed_plot_size_GiB / 1024  # Convert GiB to TiB
+    chia_netspace_TiB = float(chia_netspace) / 1100000000000  # Convert the netspace from bytes to TiB
+    assumed_plots_in_netspace = chia_netspace_TiB / uncompressed_plot_size_TiB  # Calculate the number of plots
+    reward_per_plot_xch = farmers_reward_xch / assumed_plots_in_netspace
+    reward_per_plot_usd = farmers_reward_usd / assumed_plots_in_netspace
+
     reward_24h_usd = received_24h * xch_price
     reward_7d_usd = received_7d * xch_price
     reward_30d_usd = received_30d * xch_price
+
+    # Calculate the shouldbe_Plots for each time period
+    shouldbe_Plots_24h = received_24h / reward_per_plot_xch
+    shouldbe_Plots_7d = received_7d / reward_per_plot_xch / 7
+    shouldbe_Plots_30d = received_30d / reward_per_plot_xch / 30
+
 
     print()
     print(Fore.YELLOW + "=" * 40)
@@ -173,18 +210,38 @@ if __name__ == "__main__":
     print(Fore.YELLOW + "=" * 40)
 
     print(Fore.CYAN + f"\nDate: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-    print(Fore.CYAN + f"Price XCH: ${xch_price:.2f} USD")
     print(Fore.CYAN + f"Wallet Address: {wallet_address}")
+    #print(Fore.CYAN + f"Wallet Address: not shown")
     print(Fore.CYAN + f"Electricity price [USD/kWh]: ${electricity_price_usd:.2f}\n")
 
+    # Your previous code to calculate rewards and display information
+    # ...
+
+    print(Fore.CYAN + f"Price XCH: ${xch_price:.2f} USD")
+    print(Fore.CYAN + f"Chia Netspace: {chia_netspace_EiB:.2f} EiB")
+    #print(Fore.CYAN + f"Chia Netspace: {chia_netspace_TiB:.2f} TiB")
+    #print(Fore.CYAN + f"Block Time: {block_time} seconds")
+    #print(Fore.CYAN + f"Blocks per Day: {blocks_per_day:.2f}")
+    #print(Fore.CYAN + f"Block Reward: {block_reward} XCH")
+    #print(Fore.CYAN + f"Total Farmers' Reward per Day: {farmers_reward_xch:.2f} XCH")
+    #print(Fore.CYAN + f"Total Farmers' Reward per Day (USD): ${farmers_reward_usd:.2f}")
+    print(Fore.CYAN + f"Assumed Plots in Netspace: {assumed_plots_in_netspace:.0f}")
+    #print(Fore.CYAN + f"Uncompressed Plot Size: {uncompressed_plot_size_GiB} GiB")
+    #print(Fore.CYAN + f"Uncompressed Plot Size: {uncompressed_plot_size_TiB:.3f} TiB")
+    print(Fore.CYAN + f"Reward per Plot: {reward_per_plot_xch:.6f} XCH")
+    #print(Fore.CYAN + f"Reward per Plot: {reward_per_plot_usd:.6f} USD")
+
+
+
     # Table for XCH and USD
+    print()
     print(Fore.MAGENTA + "REWARDS")
 
-    table_header = ["Period", "XCH", "USD"]
+    table_header = ["Period", "XCH", "USD", "Should-be Plots"]
     table_rows = [
-        ["24 hours", f"{received_24h:.3f}", f"${reward_24h_usd:.2f}"],
-        ["07 days", f"{received_7d:.3f}", f"${reward_7d_usd:.2f}"],
-        ["30 days", f"{received_30d:.3f}", f"${reward_30d_usd:.2f}"]
+        ["24 hours", f"{received_24h:.3f}", f"${reward_24h_usd:.2f}", f"{shouldbe_Plots_24h:.2f}"],
+        ["07 days", f"{received_7d:.3f}", f"${reward_7d_usd:.2f}", f"{shouldbe_Plots_7d:.2f}"],
+        ["30 days", f"{received_30d:.3f}", f"${reward_30d_usd:.2f}", f"{shouldbe_Plots_30d:.2f}"]
     ]
     print_table(table_header, table_rows)
 
@@ -253,3 +310,4 @@ if __name__ == "__main__":
     print(profit_color + f"  cost : ${yesterday_cost:.2f}")
     print(Fore.CYAN + "=" * 15)
     print(profit_color + f"profit : ${profit_24h:.2f}\n")
+    
