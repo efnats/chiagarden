@@ -291,7 +291,7 @@ function process_plot_files() {
       fi
     done
   else
-    echo -e "${CYAN}$(date)${RESET} There are enough free disks. No need to remove plot files."
+    echo -e "${CYAN}$(date)${RESET} There are enough free disks. No need to remove any plot files."
   fi
 }
 

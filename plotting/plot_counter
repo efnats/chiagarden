@@ -4,7 +4,7 @@
 # Variables
 ##################################
 
-interval=120 # Default rescan interval (in seconds)
+interval=180 # Default rescan interval (in seconds)
 mount_dir=""
 label="CHIA"
 maxdepth=20
@@ -77,7 +77,6 @@ find_chia_disks() {
     fi
 }
 
-
 # Spinner code
 spinner=( '⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏' )
 
@@ -96,7 +95,6 @@ stop_spinner() {
     wait "$spinner_pid" > /dev/null 2>&1
     echo -ne "\r"
 }
-
 
 count_written_data_in_period() {
     local period_in_seconds=$1
@@ -132,158 +130,185 @@ count_plot_files_in_period() {
     echo "$total_count"
 }
 
+get_disks() {
+        # Get the list of chia disks
+        chia_disks=$(find_chia_disks)
+        chia_disks_count=$(echo "$chia_disks" | wc -l)
+
+        if [ -n "$mount_dir" ]; then
+            echo -e "Counting plots in ${CYAN}$mount_dir*${RESET}"
+            echo
+        elif [ -n "$label" ]; then
+            echo -e "Counting plots in ${CYAN}$chia_disks_count${RESET} disks found with the label pattern ${CYAN}$label${RESET}"
+            echo
+        fi
+    }
+
+# Function to initialize the counters
+    initialize_counters() {
+        # Initialize an array with the patterns to search for
+        declare -g -a patterns=(
+            'plot-k32-20*.plot'
+            'plot-k32-c1-*.plot'
+            'plot-k32-c2-*.plot'
+            'plot-k32-c3-*.plot'
+            'plot-k32-c4-*.plot'
+            'plot-k32-c5-*.plot'
+            'plot-k32-c6-*.plot'
+            'plot-k32-c7-*.plot'
+            'plot-k32-c8-*.plot'
+            'plot-k32-c9-*.plot'
+            'plot-k32-c10-*.plot'
+            'plot-k32-c11-*.plot'
+            'plot-k32-c12-*.plot'
+            'plot-k32-c13-*.plot'
+            'plot-k32-c14-*.plot'
+            'plot-k32-c15-*.plot'
+            'plot-k32-c16-*.plot'
+            'plot-k32-c17-*.plot'
+            'plot-k32-c18-*.plot'
+            'plot-k32-c19-*.plot'
+            'plot-k32-c20-*.plot'
+        )
+
+        # Initialize an array to store the total counts and sizes
+        declare -g -a counts=()
+        declare -g -a sizes=()
+    }
+
+# Function to count plots and sizes
+count_plots() {
+    # Loop through all directories found by find_chia_disks
+    for disk in $(find_chia_disks)
+    do
+        # Check if the disk is accessible
+        if [ -d "$disk" ]
+        then
+            # Loop through all patterns and count the number of files matching each pattern
+            for i in "${!patterns[@]}"
+            do
+                count=$(find "$disk" -maxdepth "$maxdepth" -name "${patterns[$i]}" | wc -l)
+
+                # Add the count to the corresponding element in the counts array
+                counts[$i]=$((counts[$i] + count))
+
+                # Calculate the size of the files matching the pattern in TiB
+                size=$(find "$disk" -maxdepth "$maxdepth" -name "${patterns[$i]}" -printf '%s\n' | awk '{s+=$1} END {print s/1024/1024/1024/1024}')
+                
+                # Add the size to the corresponding element in the sizes array
+                sizes[$i]=$(awk -v size="${sizes[$i]:-0}" -v new_size="$size" 'BEGIN {print size+new_size}')
+            done
+        fi
+    done
+}
+
+plots_distribution() {
+    echo -e "${GREEN}Plots distribution${RESET}"
+    # Print the table header
+    printf "%-5s %12s %12s %12s\n" "Plot" "Count" "TiB" "eTiB"
+    printf "================================================\n"
+    
+    # Print the total counts, sizes, and effective sizes for each C-part pattern
+    total_plots=0
+    total_size=0
+    total_effective_size=0
+    for i in {0..20}
+    do
+        count="${counts[$i]}"
+        plot="C$i"
+        if [ $i -eq 0 ]
+        then
+            plot="C0"
+        fi
+        size="${sizes[$i]:-0}"
+        effective_size=$(echo "$count * 0.99023438" | bc)
+        printf "%-5s %12s %12s %12s\n" "$plot:" "$count" "$(printf '%.2f' "$size")" "$(printf '%.2f' "$effective_size")"
+        total_plots=$((total_plots + count))
+        total_size=$(awk -v total_size="$total_size" -v new_size="$size" 'BEGIN {print total_size+new_size}')
+        total_effective_size=$(awk -v total_effective_size="$total_effective_size" -v new_effective_size="$effective_size" 'BEGIN {print total_effective_size+new_effective_size}')
+    done
+
+    # Print the total number of plots, size in TiB, and effective size in eTiB
+    printf "================================================\n"
+    printf "%-5s %12s %12s %12s\n" "Total" "$total_plots" "$(printf '%.2f' "$total_size")" "$(printf '%.2f' "$total_effective_size")"
+}
+
+data_written() {
+    
+    # Call the count_plot_files_in_period and count_written_data_in_period functions
+    # plot_files_last_xx
+    plot_files_last_minute=$(count_plot_files_in_period 60)
+    plot_files_last_hour=$(count_plot_files_in_period 3600)
+    plot_files_last_day=$(count_plot_files_in_period $((24 * 3600)))
+    plot_files_last_week=$(count_plot_files_in_period $((7 * 24 * 3600)))
+    plot_files_last_month=$(count_plot_files_in_period $((4 * 7 * 24 * 3600)))
+    plot_files_last_quarter=$(count_plot_files_in_period $((3 * 30 * 24 * 3600)))
+    plot_files_last_year=$(count_plot_files_in_period $((365 * 24 * 3600)))
+
+    # written_data_last_xx
+    written_data_last_minute=$(count_written_data_in_period 60)
+    written_data_last_hour=$(count_written_data_in_period 3600)
+    written_data_last_day=$(count_written_data_in_period $((24 * 3600)))
+    written_data_last_week=$(count_written_data_in_period $((7 * 24 * 3600)))
+    written_data_last_month=$(count_written_data_in_period $((4 * 7 * 24 * 3600)))
+    written_data_last_quarter=$(count_written_data_in_period $((3 * 30 * 24 * 3600)))
+    written_data_last_year=$(count_written_data_in_period $((365 * 24 * 3600)))
+
+    # seconds_per_plot_last_xx
+    seconds_per_plot_last_minute=$(awk -v plots="$plot_files_last_minute" -v period="60" 'BEGIN {if (plots > 0) print int((period/plots) + 0.5)}')
+    seconds_per_plot_last_hour=$(awk -v plots="$plot_files_last_hour" -v period="3600" 'BEGIN {if (plots > 0) print int((period/plots) + 0.5)}')
+    seconds_per_plot_last_day=$(awk -v plots="$plot_files_last_day" -v period="$((24 * 3600))" 'BEGIN {if (plots > 0) print int((period/plots) + 0.5)}')
+    seconds_per_plot_last_week=$(awk -v plots="$plot_files_last_week" -v period="$((7 * 24 * 3600))" 'BEGIN {if (plots > 0) print int((period/plots) + 0.5)}')
+    seconds_per_plot_last_month=$(awk -v plots="$plot_files_last_month" -v period="$((4 * 7 * 24 * 3600))" 'BEGIN {if (plots > 0) print int((period/plots) + 0.5)}')
+    seconds_per_plot_last_quarter=$(awk -v plots="$plot_files_last_quarter" -v period="$((3 * 30 * 24 * 3600))" 'BEGIN {if (plots > 0) print int((period/plots) + 0.5)}')
+    seconds_per_plot_last_year=$(awk -v plots="$plot_files_last_year" -v period="$((365 * 24 * 3600))" 'BEGIN {if (plots > 0) print int((period/plots) + 0.5)}')
+
+    # Print the table header
+    echo
+    echo
+    echo -e "${GREEN}Data written${RESET}"
+    printf "%-5s %11s %12s %16s\n" "Period" "Plots" "TiB" "Seconds/Plot"
+    printf "================================================\n"
+
+    # Print the number of plot files, the amount of data written, and seconds/plot for each time period
+    printf "Minute %11s %12s %16s\n" "$plot_files_last_minute" "$written_data_last_minute" "$seconds_per_plot_last_minute"
+    printf "Hour   %11s %12s %16s\n" "$plot_files_last_hour" "$written_data_last_hour" "$seconds_per_plot_last_hour"
+    printf "Day    %11s %12s %16s\n" "$plot_files_last_day" "$written_data_last_day" "$seconds_per_plot_last_day"
+    printf "Week   %11s %12s %16s\n" "$plot_files_last_week" "$written_data_last_week" "$seconds_per_plot_last_week"
+    printf "Month  %11s %12s %16s\n" "$plot_files_last_month" "$written_data_last_month" "$seconds_per_plot_last_month"
+    printf "Quarter%11s %12s %16s\n" "$plot_files_last_quarter" "$written_data_last_quarter" "$seconds_per_plot_last_quarter"
+    printf "Year   %11s %12s %16s\n" "$plot_files_last_year" "$written_data_last_year" "$seconds_per_plot_last_year"
+}
 
 
-# Loop indefinitely
+# Function to sleep for the specified interval before repeating the loop
+sleep_interval() {
+    echo
+    echo -e "every ${CYAN}$interval${RESET} seconds"
+    sleep "$interval"
+}
+
+
+# Main loop
 while true
 do
     # Clear the terminal screen
     clear
-
-    # Get the list of chia disks
-    chia_disks=$(find_chia_disks)
-    chia_disks_count=$(echo "$chia_disks" | wc -l)
-    echo $find_chia_disks
-
-    if [ -n "$mount_dir" ]; then
-        echo -e "Counting plots in ${CYAN}$mount_dir*${RESET}"
-        echo
-    elif [ -n "$label" ]; then
-        echo -e "Counting plots in $chia_disks_count disks found with label pattern ${CYAN}$label${RESET}"
-        echo
-    fi
-
+    echo -e "${BOLD}Chia Plot Counter${RESET}"
+    echo
+    # get the disks
+    get_disks
+    
     # Start the spinner
     start_spinner
 
-    # Initialize an array with the patterns to search for
-    patterns=(
-        'plot-k32-20*.plot'
-        'plot-k32-c1-*.plot'
-        'plot-k32-c2-*.plot'
-        'plot-k32-c3-*.plot'
-        'plot-k32-c4-*.plot'
-        'plot-k32-c5-*.plot'
-        'plot-k32-c6-*.plot'
-        'plot-k32-c7-*.plot'
-        'plot-k32-c8-*.plot'
-        'plot-k32-c9-*.plot'
-        'plot-k32-c10-*.plot'
-        'plot-k32-c11-*.plot'
-        'plot-k32-c12-*.plot'
-        'plot-k32-c13-*.plot'
-        'plot-k32-c14-*.plot'
-        'plot-k32-c15-*.plot'
-        'plot-k32-c16-*.plot'
-        'plot-k32-c17-*.plot'
-        'plot-k32-c18-*.plot'
-        'plot-k32-c19-*.plot'
-        'plot-k32-c20-*.plot'
+    # Call the function to initialize the counters
+    initialize_counters
 
-    )
+    count_plots
+    stop_spinner
+    plots_distribution
+    data_written
+    sleep_interval
 
-    # Initializea n array to store the total counts and sizes
-    counts=()
-    sizes=()
-
-## Debugging: Print the folders that are going to be processed
-#echo -e "${YELLOW}Debugging:${RESET} Folders to be processed:"
-#for disk in $(find_chia_disks)
-#do
-#    echo "$disk"
-#done
-#echo
-
-# Loop through all directories found by find_chia_disks
-for disk in $(find_chia_disks)
-do
-    # Check if the disk is accessible
-    if [ -d "$disk" ]
-    then
-        # Loop through all patterns and count the number of files matching each pattern
-        for i in "${!patterns[@]}"
-        do
-            count=$(find "$disk" -maxdepth "$maxdepth" -name "${patterns[$i]}" | wc -l)
-
-            # Add the count to the corresponding element in the counts array
-            counts[$i]=$((counts[$i] + count))
-
-            # Calculate the size of the files matching the pattern in TiB
-            size=$(find "$disk" -maxdepth "$maxdepth" -name "${patterns[$i]}" -printf '%s\n' | awk '{s+=$1} END {print s/1024/1024/1024/1024}')
-            
-            # Add the size to the corresponding element in the sizes array
-            sizes[$i]=$(awk -v size="${sizes[$i]:-0}" -v new_size="$size" 'BEGIN {print size+new_size}')
-        done
-    fi
-done
-
-# Stop the spinner
-stop_spinner
-
-echo -e "${GREEN}Plots distribution${RESET}"
-# Print the table header
-printf "%-5s %12s %12s\n" "Plot" "Count" "TiB"
-printf "===============================\n"
-
-# Print the total counts and sizes for each C-part pattern
-total_plots=0
-total_size=0
-for i in {0..20}
-do
-    count="${counts[$i]}"
-    plot="C$i"
-    if [ $i -eq 0 ]
-    then
-        plot="C0"
-    fi
-    size="${sizes[$i]:-0}"
-    printf "%-5s %12s %12s\n" "$plot:" "$count" "$(printf '%.2f' "$size")"
-    total_plots=$((total_plots + count))
-    total_size=$(awk -v total_size="$total_size" -v new_size="$size" 'BEGIN {print total_size+new_size}')
-done
-
-# Print the total number of plots and size in TiB
-printf "===============================\n"
-printf "%-5s %12s %12s\n" "Total" "$total_plots" "$(printf '%.2f' "$total_size")"
-
-
-
-# Call the count_plot_files_in_period and count_written_data_in_period functions
-plot_files_last_minute=$(count_plot_files_in_period 60)
-written_data_last_minute=$(count_written_data_in_period 60)
-
-plot_files_last_hour=$(count_plot_files_in_period 3600)
-written_data_last_hour=$(count_written_data_in_period 3600)
-
-plot_files_last_day=$(count_plot_files_in_period $((24 * 3600)))
-written_data_last_day=$(count_written_data_in_period $((24 * 3600)))
-
-plot_files_last_week=$(count_plot_files_in_period $((7 * 24 * 3600)))
-written_data_last_week=$(count_written_data_in_period $((7 * 24 * 3600)))
-
-plot_files_last_month=$(count_plot_files_in_period $((4 * 7 * 24 * 3600)))
-written_data_last_month=$(count_written_data_in_period $((4 * 7 * 24 * 3600)))
-
-# Print the table header
-echo
-echo
-echo -e "${GREEN}Data written${RESET}"
-printf "%-5s %11s %12s\n" "Period" "Plots" "TiB"
-printf "===============================\n"
-
-# Print the number of plot files and the amount of data written for each time period
-printf "Minute %11s %12s\n" "$plot_files_last_minute" "$written_data_last_minute"
-printf "Hour   %11s %12s\n" "$plot_files_last_hour" "$written_data_last_hour"
-printf "Day    %11s %12s\n" "$plot_files_last_day" "$written_data_last_day"
-printf "Week   %11s %12s\n" "$plot_files_last_week" "$written_data_last_week"
-printf "Month  %11s %12s\n" "$plot_files_last_month" "$written_data_last_month"
-
-
-
-
-
-# Sleep for the specified interval before repeating the loop
-    echo
-    echo -e "every ${CYAN}$interval${RESET} seconds"
-    sleep "$interval"
 done
