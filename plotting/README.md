@@ -164,7 +164,7 @@ The systemd services for plotsink and plotstarter are part of the installation r
    ```
 
 
-# plot_avg Plotting Time Calculation Script
+# plot_avg - Plotting Time Calculation Script
 
 This script calculates the average creation time of Chia plots over a specified period by parsing the `plot-starter` logs.
 
