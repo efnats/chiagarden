@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Initialize default value for last
+last=30
+
+# Parse command line arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --last)
+        last="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        --last=*)
+        last="${1#*=}"
+        shift # past argument=value
+        ;;
+        *)
+        shift # past unknown option
+        ;;
+    esac
+done
+
+
+# Extract lines from the last $last minutes of the plot-starter logs that contain the creation times
+data=$(journalctl --since "$last minutes ago" -u plot-starter | grep "Total plot creation time was" | awk '{print $11}')
+
+count=0
+total=0
+
+# Process each time and calculate the sum and count
+for time in $data; do
+    # Ensure the extracted time is a valid number
+    if [[ $time =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        total=$(echo "$total + $time" | bc)
+        ((count++))
+    fi
+done
+
+# If no plots were found, exit
+if [ $count -eq 0 ]; then
+    echo "No plots found in the last $last minutes."
+    exit 0
+fi
+
+# Calculate the average
+averageseconds=$(echo "scale=2; $total/$count" | bc)
+averageminutes=$(echo "scale=2; $averageseconds/60" | bc)
+
+echo "Avg plot creation time"
+echo "last $last minutes"
+echo
+echo "$averageseconds seconds | $averageminutes minutes"
