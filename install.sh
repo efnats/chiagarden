@@ -27,6 +27,28 @@ if [[ "$response" =~ ^([nN][oO]|[nN])$ ]]; then
   exit 1
 fi
 
+# Array of full paths for old program files that have been renamed or are no longer needed
+obsolete_program_names=(
+    "/usr/local/bin/plot_avg"
+    # Add the full path for more old program files as needed
+)
+
+# Remove old program files
+remove_obsolete_program_names() {
+    for file_renamed in "${obsolete_program_names[@]}"; do
+        if [[ -e $file_renamed ]]; then
+            echo -e "${YELLOW}Migrating $file_renamed..${NC}"
+            rm "$file_renamed"
+        else
+            echo -e "${RED}$file_renamed no migration needed.${NC}"
+        fi
+    done
+}
+
+
+# Call the function to clean up old programs
+remove_oboslete_program_names
+
 apt update
 apt install -y curl lsb-release xfsprogs ntfs-3g smartmontools parted python3 python3-pip
 
@@ -104,6 +126,8 @@ files_to_copy=(
   "./plotting/plot_mover"
   "./plotting/plot_over"
   "./plotting/plot_starter"
+  "./plotting/plot_timer"
+  "./plotting/plot_cleaner"
   "./plotting/plotsink.sh"
   "./taco_list/taco_list"
 )

@@ -164,7 +164,7 @@ The systemd services for plotsink and plotstarter are part of the installation r
    ```
 
 
-# plot_avg - Plotting Time Calculation Script
+# plot_timer - Plotting Time Calculation Script
 
 This script calculates the average creation time of Chia plots over a specified period by parsing the `plot-starter` logs.
 
@@ -173,23 +173,61 @@ This script calculates the average creation time of Chia plots over a specified 
 - Calculate the average plot creation time for Chia plots.
 - Ability to specify the time frame for the logs to be considered.
 
-## Requirements
-
-The script is intended to be run on a system with the following:
-- A Unix-like operating system (Linux, macOS)
-- `journalctl` utility available (commonly available on systemd-based systems)
-- `bc` for arbitrary precision numeric processing
-
 # Usage
 
 To execute the script, you can simply run it from the command line. 
-# By default, the script calculates the average plot creation time for the last 30 minutes:
+By default, the script calculates the average plot creation time for the last 30 minutes:
 ```bash
 plot_avg
 ```
 
-# To specify a different time frame, use the `--last` parameter followed by the number of minutes:
+To specify a different time frame, use the `--last` parameter followed by the number of minutes:
 ```bash
 plot_avg --last=60
 ```
 
+# plot_cleaner - keep your destination drive tidy
+
+The Plot Cleaner script is designed to help manage disk space by periodically identifying and removing `.plot.tmp` files that are no longer being written to. This is particularly useful for example, when a plotting stops for an unexpected reason.
+A plot file's age is checked against a user-defined threshold (in minutes). If a file is older than the specified age, it is a candidate for deletion.
+To ensure that a file is not currently being written to, the script monitors the file size over a user-defined interval (in seconds). If the file size does not change between checks, it is assumed that the file is no longer being actively written to and can be safely removed.   
+
+
+## Features
+
+- **Automatic Deletion**: Deletes `.plot.tmp` files based on age and write-status.
+- **Configurable**: Allows custom settings for directory paths, age threshold, and check intervals.
+- **Dry Run Option**: Includes a dry run mode to preview files that would be deleted without actually removing them.
+
+## Installation
+
+To run plot_cleaner periodically add a line to crontab:
+```bash
+crontab -e
+```
+for example, to run the script once every hour:
+```
+0 * * * * /usr/local/bin/plot_cleaner
+```
+
+## Usage
+
+To use the script, navigate to the directory containing `plot_cleaner` and run the following command:
+
+```bash
+./plot_cleaner [OPTIONS]
+```
+
+## Options
+
+- `--directory PATH`: Set the directory where `.plot.tmp` files are stored (default: `/mnt/garden/gigahorse`).
+- `--age MINUTES`: Set the minimum age of files to be considered for deletion (in minutes).
+- `--watchtime SECONDS`: Set the duration to wait between file size checks to determine if the file is still being written to (in seconds).
+- `--dry-run`: Display the files that would be deleted without actually performing the deletion.
+
+## Example
+
+Perform a dry run that displays files older than 720 minutes which would be deleted
+```bash 
+./plot_cleaner --directory /mnt/garden/gigahorse --age 720 --watchtime 15 --dry-run
+```

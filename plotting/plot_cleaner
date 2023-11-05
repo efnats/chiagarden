@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Default directory where the .plot.tmp files are stored
+DEFAULT_PLOT_DIR="/mnt/garden/gigahorse"
+
+# Default minimum age of files to consider (in minutes)
+DEFAULT_MIN_AGE=360
+
+# Default sleep duration between size checks (in seconds)
+DEFAULT_WATCH_SECONDS=15
+
+# Initialize variables with default values
+PLOT_DIR=$DEFAULT_PLOT_DIR
+MIN_AGE=$DEFAULT_MIN_AGE
+WATCH_SECONDS=$DEFAULT_WATCH_SECONDS
+FILES_DELETED=0
+
+# Function to show usage
+usage() {
+    echo "Usage: $0 [--directory PATH] [--age MINUTES] [--watchtime SECONDS] [--dry-run]"
+    exit 1
+}
+
+# Parse the command line arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --dry-run) DRY_RUN=1 ;;
+        --directory)
+            if [[ -n $2 ]]; then
+                PLOT_DIR=$2
+                shift
+            else
+                echo "Error: --directory must be followed by a path."
+                usage
+            fi
+            ;;
+        --age)
+            if [[ -n $2 ]]; then
+                MIN_AGE=$2
+                shift
+            else
+                echo "Error: --age must be followed by a number."
+                usage
+            fi
+            ;;
+        --watchtime)
+            if [[ -n $2 ]]; then
+                WATCH_SECONDS=$2
+                shift
+            else
+                echo "Error: --watchtime must be followed by a number."
+                usage
+            fi
+            ;;
+        *) 
+            echo "Error: Unsupported flag $1" >&2
+            usage
+            ;;
+    esac
+    shift
+done
+
+# Function to check if a file size remains the same
+check_and_delete() {
+    local file=$1
+    local initial_size=$(stat -c%s "$file")
+    sleep $WATCH_SECONDS
+    local final_size=$(stat -c%s "$file")
+
+    if [ "$initial_size" -eq "$final_size" ]; then
+        if [ -n "$DRY_RUN" ]; then
+            echo "Dry run: File '$file' would be deleted."
+        else
+            echo "Deleting file '$file'."
+            rm "$file"
+            let FILES_DELETED++
+        fi
+    else
+        echo "File '$file' is still being written to."
+    fi
+}
+
+# Main functionality of the script
+export -f check_and_delete
+export WATCH_SECONDS
+export DRY_RUN
+
+find "$PLOT_DIR" -name '*.plot.tmp' -mmin +$MIN_AGE -exec bash -c 'check_and_delete "$0"' {} \;
+
+if [ "$FILES_DELETED" -eq 0 ]; then
+    if [ -n "$DRY_RUN" ]; then
+        echo "Dry run: No files were found that would be deleted."
+    else
+        echo "No files were deleted."
+    fi
+else
+    if [ -n "$DRY_RUN" ]; then
+        echo "Dry run: A total of $FILES_DELETED files would have been deleted."
+    else
+        echo "A total of $FILES_DELETED files were deleted."
+    fi
+fi
