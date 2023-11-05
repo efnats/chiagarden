@@ -178,12 +178,12 @@ This script calculates the average creation time of Chia plots over a specified 
 To execute the script, you can simply run it from the command line. 
 By default, the script calculates the average plot creation time for the last 30 minutes:
 ```bash
-plot_avg
+plot_timer
 ```
 
 To specify a different time frame, use the `--last` parameter followed by the number of minutes:
 ```bash
-plot_avg --last=60
+plot_timer --last=60
 ```
 
 # plot_cleaner - keep your destination drive tidy
