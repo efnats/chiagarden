@@ -186,7 +186,7 @@ To specify a different time frame, use the `--last` parameter followed by the nu
 plot_timer --last=60
 ```
 
-# plot_cleaner - keep your destination drive tidy
+# plot_cleaner - remove those unfinished .plot.tmp files
 
 The Plot Cleaner script is designed to help manage disk space by periodically identifying and removing `.plot.tmp` files that are no longer being written to. This is particularly useful for example, when a plotting stops for an unexpected reason.
 A plot file's age is checked against a user-defined threshold (in minutes). If a file is older than the specified age, it is a candidate for deletion.
