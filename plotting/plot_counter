@@ -131,18 +131,26 @@ count_plot_files_in_period() {
 }
 
 get_disks() {
-        # Get the list of chia disks
-        chia_disks=$(find_chia_disks)
-        chia_disks_count=$(echo "$chia_disks" | wc -l)
+    # Get the list of chia disks
+    chia_disks=$(find_chia_disks)
+    chia_disks_count=$(echo "$chia_disks" | grep -v '^$' | wc -l) # Count non-empty lines
 
-        if [ -n "$mount_dir" ]; then
-            echo -e "Counting plots in ${CYAN}$mount_dir*${RESET}"
-            echo
-        elif [ -n "$label" ]; then
-            echo -e "Counting plots in ${CYAN}$chia_disks_count${RESET} disks found with the label pattern ${CYAN}$label${RESET}"
-            echo
-        fi
-    }
+    echo # Add an extra line for better visual separation
+
+    if [ -n "$mount_dir" ]; then
+        echo -e "${CYAN}Counting plots in directories:${RESET} $mount_dir*"
+    elif [ -n "$label" ]; then
+        echo -e "${CYAN}Disks with label pattern '${label}':${RESET} $chia_disks_count"
+    else
+        echo -e "${RED}No mount directory or label pattern specified.${RESET}"
+    fi
+
+    echo # Add an extra line for better visual separation
+}
+
+# Call the function to see the output
+get_disks
+
 
 # Function to initialize the counters
     initialize_counters() {
@@ -206,7 +214,7 @@ plots_distribution() {
     echo -e "${GREEN}Plots distribution${RESET}"
     # Print the table header
     printf "%-5s %12s %12s %12s\n" "Plot" "Count" "TiB" "eTiB"
-    printf "================================================\n"
+    printf "============================================\n"
     
     # Print the total counts, sizes, and effective sizes for each C-part pattern
     total_plots=0
@@ -215,11 +223,12 @@ plots_distribution() {
     for i in {0..20}
     do
         count="${counts[$i]}"
-        plot="C$i"
-        if [ $i -eq 0 ]
-        then
-            plot="C0"
+        # Skip the line if the count is zero
+        if [ "$count" -eq 0 ]; then
+            continue
         fi
+
+        plot="C$i"
         size="${sizes[$i]:-0}"
         effective_size=$(echo "$count * 0.99023438" | bc)
         printf "%-5s %12s %12s %12s\n" "$plot:" "$count" "$(printf '%.2f' "$size")" "$(printf '%.2f' "$effective_size")"
@@ -229,9 +238,10 @@ plots_distribution() {
     done
 
     # Print the total number of plots, size in TiB, and effective size in eTiB
-    printf "================================================\n"
+    printf "============================================\n"
     printf "%-5s %12s %12s %12s\n" "Total" "$total_plots" "$(printf '%.2f' "$total_size")" "$(printf '%.2f' "$total_effective_size")"
 }
+
 
 data_written() {
     
@@ -267,17 +277,17 @@ data_written() {
     echo
     echo
     echo -e "${GREEN}Data written${RESET}"
-    printf "%-5s %11s %12s %16s\n" "Period" "Plots" "TiB" "Seconds/Plot"
-    printf "================================================\n"
+    printf "%-5s %11s %12s %12s\n" "Period" "Plots" "TiB" "Sec/Plot"
+    printf "============================================\n"
 
     # Print the number of plot files, the amount of data written, and seconds/plot for each time period
-    printf "Minute %11s %12s %16s\n" "$plot_files_last_minute" "$written_data_last_minute" "$seconds_per_plot_last_minute"
-    printf "Hour   %11s %12s %16s\n" "$plot_files_last_hour" "$written_data_last_hour" "$seconds_per_plot_last_hour"
-    printf "Day    %11s %12s %16s\n" "$plot_files_last_day" "$written_data_last_day" "$seconds_per_plot_last_day"
-    printf "Week   %11s %12s %16s\n" "$plot_files_last_week" "$written_data_last_week" "$seconds_per_plot_last_week"
-    printf "Month  %11s %12s %16s\n" "$plot_files_last_month" "$written_data_last_month" "$seconds_per_plot_last_month"
-    printf "Quarter%11s %12s %16s\n" "$plot_files_last_quarter" "$written_data_last_quarter" "$seconds_per_plot_last_quarter"
-    printf "Year   %11s %12s %16s\n" "$plot_files_last_year" "$written_data_last_year" "$seconds_per_plot_last_year"
+    printf "Minute %11s %12s %12s\n" "$plot_files_last_minute" "$written_data_last_minute" "$seconds_per_plot_last_minute"
+    printf "Hour   %11s %12s %12s\n" "$plot_files_last_hour" "$written_data_last_hour" "$seconds_per_plot_last_hour"
+    printf "Day    %11s %12s %12s\n" "$plot_files_last_day" "$written_data_last_day" "$seconds_per_plot_last_day"
+    printf "Week   %11s %12s %12s\n" "$plot_files_last_week" "$written_data_last_week" "$seconds_per_plot_last_week"
+    printf "Month  %11s %12s %12s\n" "$plot_files_last_month" "$written_data_last_month" "$seconds_per_plot_last_month"
+    printf "Quarter%11s %12s %12s\n" "$plot_files_last_quarter" "$written_data_last_quarter" "$seconds_per_plot_last_quarter"
+    printf "Year   %11s %12s %12s\n" "$plot_files_last_year" "$written_data_last_year" "$seconds_per_plot_last_year"
 }
 
 
@@ -294,8 +304,7 @@ while true
 do
     # Clear the terminal screen
     clear
-    echo -e "${BOLD}Chia Plot Counter${RESET}"
-    echo
+    echo -e "${BOLD}ChiaGarden plot_counter${RESET}"
     # get the disks
     get_disks
     
