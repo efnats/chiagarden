@@ -47,7 +47,7 @@ remove_obsolete_program_names() {
 
 
 # Call the function to clean up old programs
-remove_oboslete_program_names
+remove_obsolete_program_names
 
 apt update
 apt install -y curl lsb-release xfsprogs ntfs-3g smartmontools parted python3 python3-pip
