@@ -9,32 +9,47 @@ BOLD="\033[1m"
 RESET="\033[0m"
 
 initialize_parameters() {
-# Set the default config variable
-config="plot_starter.config" 
+    # Set the default config variable
+    config="plot_starter.config"                        # Default config file
+    plotterbin="/usr/local/bin/cuda_plot_k32"           # Path to plotter binary
+    chia_plot_copy_bin="/usr/local/bin/chia_plot_copy"  # Path to chia_plot_copy binary
 
+    # These are typical values needed to be set to start plotting
+    contract="POOL_CONTRACT_ADDRESS"    # Pool Contract Address (62 chars), empty if not used
+    farmerkey="FARMER_KEY"   # Farmer Public Key (48 bytes), empty if not used
+    level="18"       # Compression level (1 to 9 and 11 to 20)
+    count="-1"     # Number of plots to create (default = 1, unlimited = -1)
+    finaldir="/mnt/plotting"    # Final destinations (default = <tmpdir>, remote = @HOST)
+    tmpdir=""      # Temporary directories for plot storage (default = $PWD)
+    tmpdir2=""     # Temporary directory 2 for partial RAM/disk mode (default = @RAM)
+    tmpdir3=""     # Temporary directory 3 for disk mode (default = @RAM)
 
-# Default settings for config
-# These values will be overwritten if a config is loaded with the same variables set
-farmerkey="your_farmer_key"
-contract="pool_contract_address"
-plotamount=-1
-compression=5
-plotting_dir="/mnt/plotting" # your temporary plotting dir (-t in cuda_plot_k32)
-dest_dir=192.168.31.33 # set to a destination dir or a host where plotsink is running
-plotterbin="/usr/local/bin/cuda_plot_k32"
-chia_plot_copy_bin="/usr/local/bin/chia_plot_copy"
+    # These values are less often used
+    port=""        # Network port (default = 8444, MMX = 11337)
+    device=""      # CUDA device (default = 0)
+    ndevices=""    # Number of CUDA devices (default = 1)
+    dstport=""     # Destination port for remote copy (default = 1337)
+    waitforcopy="" # Wait for copy to start next plot (false)
+    poolkey=""     # Pool Public Key (48 bytes), empty if not used
+    unique=""      # Make unique plot (false)
+    directio=""    # Use direct IO for final copy (false, Linux only)
+    streams=""     # Number of parallel streams (default = 3, must be >= 2)
+    chunksize=""   # Bucket chunk size in MiB (default = 16, 1 to 256)
+    maxtmp=""      # Max number of plots to cache in tmpdir (default = -1)
+    copylimit=""   # Max number of parallel copies in total (default = -1)
+    maxcopy=""     # Max number of parallel copies to same HDD (default = 1, unlimited = -1)
+    memory=""      # Max shared/pinned memory in GiB (default = unlimited)
 
-
-### Variables for the guru-mediation option. 
-### It delays start of the plotting process if the system has rebooted (crashed) too often
-### This is a known behaviour if a nvme is worn out
-max_reboots=2           # Number of reboots
-lastminutes=120         # Time window in minutes
-cooldowntime=15         # Wait time in minutes
-
-# Initialize the guru_meditation variable
-guru_meditation=false
+    ### Variables for the guru-mediation option. 
+    ### It delays start of the plotting process if the system has rebooted (crashed) too often
+    ### This is a known behaviour if a nvme is worn out, or the PSU is overloaded
+    
+    guru_meditation=false   
+    max_reboots=2           # If the system has rebooted more than x times...
+    lastminutes=120         # ...in the last y minutes...
+    cooldowntime=15         # ...delay the start of the plotting process by z minutes
 }
+
 
 
 # Add help text
@@ -82,11 +97,11 @@ done
 # Function to load config from a file
 load_config() {
     local config_path="$1"
-    if [ -f "$1" ]; then
-        source "$1"
+    if [ -f "$config_path" ]; then
+        echo "Loading config: $config_path"
+        source "$config_path"
     else
-        echo "config not found: $1"
-        return 1
+        echo "Using default script parameters."
     fi
 }
 
@@ -161,20 +176,53 @@ apply_guru_meditation() {
     fi
 }
 
-# Start the Chia plotter
 start_plotter() {
-    echo "Starting up..."
-    $plotterbin -n $plotamount -C $compression -t $plotting_dir/ -d @$dest_dir -f $farmerkey -c $contract
+    local cmd="$plotterbin"
+
+    # Add parameters to the command if they are set in the configuration
+    [[ -n $level ]] && cmd+=" -C $level"
+    [[ -n $port ]] && cmd+=" -x $port"
+    [[ -n $count ]] && cmd+=" -n $count"
+    [[ -n $device ]] && cmd+=" -g $device"
+    [[ -n $ndevices ]] && cmd+=" -r $ndevices"
+    [[ -n $tmpdir ]] && cmd+=" -t $tmpdir"
+    [[ -n $tmpdir2 ]] && cmd+=" -2 $tmpdir2"
+    [[ -n $tmpdir3 ]] && cmd+=" -3 $tmpdir3"
+    [[ -n $finaldir ]] && cmd+=" -d $finaldir"
+    [[ -n $dstport ]] && cmd+=" -z $dstport"
+    [[ -n $waitforcopy ]] && cmd+=" -w"
+    [[ -n $poolkey ]] && cmd+=" -p $poolkey"
+    [[ -n $contract ]] && cmd+=" -c $contract"
+    [[ -n $farmerkey ]] && cmd+=" -f $farmerkey"
+    [[ -n $unique ]] && cmd+=" -Z"
+    [[ -n $directio ]] && cmd+=" -D"
+    [[ -n $streams ]] && cmd+=" -S $streams"
+    [[ -n $chunksize ]] && cmd+=" -B $chunksize"
+    [[ -n $maxtmp ]] && cmd+=" -Q $maxtmp"
+    [[ -n $copylimit ]] && cmd+=" -A $copylimit"
+    [[ -n $maxcopy ]] && cmd+=" -W $maxcopy"
+    [[ -n $memory ]] && cmd+=" -M $memory"
+
+    # Output the command with all parameters
+    echo "Command to be executed: $cmd"
+
+    # Now execute the command
+    #eval "$cmd"
 }
 
 
 # Main execution
 main() {
-    initialize_parameters
-    parse_arguments "$@"
-    load_config "$config"
-    check_and_mount_dir "${plotting_dir}"
-    manage_plot_files "${plotting_dir}" "$dest_dir"
+    initialize_parameters  # Set default parameters first
+    parse_arguments "$@"   # Parse command-line arguments
+
+    # If a config file is specified and valid, it will override default parameters
+    if [ -n "$config" ] && [ -f "$config" ]; then
+        load_config "$config"
+    fi
+
+    check_and_mount_dir "${finaldir}"
+    # manage_plot_files "${finaldir}" "$dest_dir"  # Uncomment if needed
     apply_guru_meditation "$lastminutes" "$max_reboots" "$cooldowntime" "$guru_meditation"
     start_plotter
 }
