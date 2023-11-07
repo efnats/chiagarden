@@ -145,11 +145,6 @@ get_gb() {
 }
 
 
-get_gb() {
-    local bytes="$1"
-    echo "scale=2; $bytes / (1024*1024*1024)" | bc
-}
-
 mount_slack_losetup() {
     local disk_mount_point="$1"
     local loop_device
@@ -327,7 +322,7 @@ mount_action() {
     while IFS= read -r disk; do
         found_disks=$((found_disks + 1))
         mount_disk "$disk"
-    done < <(find /dev/disk/by-label -name "$label_pattern")
+    done < <(find /dev/disk/by-label -name "$label_pattern*")
 
     # If slack argument was given, process slack mounts
     if [ "$slack" == "yes" ]; then
@@ -444,7 +439,7 @@ unmount_action() {
         local device=$(readlink -f "$disk")
         found_disks=$((found_disks + 1))
         unmount_slack "$(findmnt -n -o TARGET "$device")"
-    done < <(find /dev/disk/by-label -name "$label_pattern")
+    done < <(find /dev/disk/by-label -name "$label_pattern*")
 
     # Next, unmount the fuse.mergerfs filesystem
     echo
@@ -458,7 +453,7 @@ unmount_action() {
         local device=$(readlink -f "$disk")
         unmount_disk "$device"
         unmount_cleanup "$(findmnt -n -o TARGET "$device")"
-    done < <(find /dev/disk/by-label -name "$label_pattern")
+    done < <(find /dev/disk/by-label -name "$label_pattern*")
     
     echo
     echo -e "${GREEN}$found_disks disks unmounted.${RESET}"
@@ -467,7 +462,7 @@ unmount_action() {
 
 
 action=""
-label_pattern="CHIA*"
+label_pattern="CHIA"
 read_only=""
 mount_point=""
 mergerfs_path=""
