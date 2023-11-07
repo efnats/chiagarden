@@ -2,30 +2,12 @@
 
 # Description: Installer script for ChiaGarden - a set of Linux tools to build and manage a Chia post farm.
 
-# Clear the terminal
-clear
-
 # Define colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
-
-# Check for root privileges
-if [[ $EUID -ne 0 ]]; then
-  echo -e "${RED}This script must be run as root${NC}" 
-  exit 1
-fi
-
-# Print header
-echo -e "${GREEN}ChiaGarden Installer${NC}"
-echo "----------------------------------"
-
-read -p "This script will install ChiaGarden and its dependencies. Do you want to proceed? [Y/n] " response
-if [[ "$response" =~ ^([nN][oO]|[nN])$ ]]; then
-  echo -e "${RED}Installation canceled.${NC}"
-  exit 1
-fi
 
 # Array of full paths for old program files that have been renamed or are no longer needed
 obsolete_program_names=(
@@ -33,27 +15,61 @@ obsolete_program_names=(
     # Add the full path for more old program files as needed
 )
 
+# Check for root privileges
+check_root() {
+if [[ $EUID -ne 0 ]]; then
+  echo -e "${RED}This script must be run as root${NC}" 
+  exit 1
+fi
+}
+
+print_header() {
+# # ASCII art for the ChiaGarden logo
+# cat << "EOF"
+#  __ .      .__         .      
+# /  `|_ * _.[ __ _.._. _| _ ._ 
+# \__.[ )|(_][_./(_][  (_](/,[ )
+# EOF
+# echo "_______________________________"
+  echo -e
+  echo -e "${GREEN}ChiaGarden Installer${NC}"
+  echo -e
+  echo -e "Installing ChiaGarden and its dependencies."
+  echo -e "To cancel at any time, press ${YELLOW}Ctrl+C${NC}."
+  echo
+  read -p "Proceed? [Y/n] " -r -e -i "Y" proceed_response
+
+  if [[ ! "$proceed_response" =~ ^([yY][eE][sS]|[yY])?$ ]]; then
+    echo -e "${YELLOW}Installation cancelled. Exiting now.${NC}"
+    exit 1
+  fi
+}
+
 # Remove old program files
 remove_obsolete_program_names() {
+echo -e "\n${YELLOW}Checking for migration candidates...${NC}"
+
     for file_renamed in "${obsolete_program_names[@]}"; do
         if [[ -e $file_renamed ]]; then
             echo -e "${YELLOW}Migrating $file_renamed..${NC}"
             rm "$file_renamed"
         else
-            echo -e "${RED}$file_renamed no migration needed.${NC}"
+            echo -e "${GREEN}No migration required.${NC}"
         fi
     done
 }
 
-
-# Call the function to clean up old programs
-remove_obsolete_program_names
-
+# Dependencies
+install_dependencies() {
+echo -e "\n${YELLOW}Updating package list and installing dependencies...${NC}"
 apt update
 apt install -y curl lsb-release xfsprogs ntfs-3g smartmontools parted python3 python3-pip
+pip3 install colorama
+pip3 install requests
+}
 
-
-install_or_update_mergerfs() {
+install_mergerfs() {
+    echo -e "\n${YELLOW}Installing mergerfs...${NC}"
     # Get the OS release name
     os_release=$(lsb_release -cs)
 
@@ -89,22 +105,11 @@ install_or_update_mergerfs() {
         rm /tmp/mergerfs.deb
     fi
 
-    echo "Installation or update completed."
+    echo -e "${GREEN}Installation or update completed.${NC}"
+    echo
 }
 
-# Install or update mergerfs
-echo -e "\n${YELLOW}Installing mergerfs...${NC}"
-install_or_update_mergerfs
-
-# Update package list and install dependencies
-echo -e "\n${YELLOW}Updating package list and installing dependencies...${NC}"
-apt install -y $DEPENDENCIES
-
-# Install necessary Python packages using pip3
-echo -e "\n${YELLOW}Installing required Python packages...${NC}"
-pip3 install colorama
-pip3 install requests
-
+create_drectories() {
 # Create /etc/chiagarden directory if it doesn't exist
 echo -e "\n${YELLOW}Checking for /etc/chiagarden directory...${NC}"
 if [[ ! -d /etc/chiagarden ]]; then
@@ -112,40 +117,40 @@ if [[ ! -d /etc/chiagarden ]]; then
     mkdir /etc/chiagarden
     echo -e "${GREEN}/etc/chiagarden directory created.${NC}"
 else
-    echo -e "${GREEN}/etc/chiagarden directory already exists.${NC}"
+    echo -e "${GREEN}/etc/chiagarden${NC} directory already exists."
 fi
+}
 
+copy_files() {
+    # Copy files
+    echo -e "\n${YELLOW}Copying ChiaGarden files...${NC}"
+    files_to_copy=(
+      "./chiainit/chiainit"
+      "./gardenmount/gardenmount"
+      "./cropgains/cropgains"
+      "./plotting/plot_counter"
+      "./plotting/plot_mover"
+      "./plotting/plot_over"
+      "./plotting/plot_starter"
+      "./plotting/plot_timer"
+      "./plotting/plot_cleaner"
+      "./plotting/plotsink.sh"
+      "./taco_list/taco_list"
+    )   
 
-# Copy files
-echo -e "\n${YELLOW}Copying ChiaGarden files...${NC}"
-files_to_copy=(
-  "./chiainit/chiainit"
-  "./gardenmount/gardenmount"
-  "./cropgains/cropgains"
-  "./plotting/plot_counter"
-  "./plotting/plot_mover"
-  "./plotting/plot_over"
-  "./plotting/plot_starter"
-  "./plotting/plot_timer"
-  "./plotting/plot_cleaner"
-  "./plotting/plotsink.sh"
-  "./taco_list/taco_list"
-)
+    for file in "${files_to_copy[@]}"; do
+      if [[ -e $file ]]; then
+        cp $file /usr/local/bin/
+        echo -e "${GREEN}Copied${NC} $file ${GREEN}to /usr/local/bin/${NC}"
+      else
+        echo -e "${RED}Error: File $file not found${NC}"
+        exit 1
+      fi
+    done
+}
 
-for file in "${files_to_copy[@]}"; do
-  if [[ -e $file ]]; then
-    cp $file /usr/local/bin/
-    echo -e "${GREEN}Copied${NC} $file ${GREEN}to /usr/local/bin/${NC}"
-  else
-    echo -e "${RED}Error: File $file not found${NC}"
-    exit 1
-  fi
-done
-echo
-
-# Function to download and set permissions (needed for plot_starter)
-echo -e "${YELLOW}Downloading and setting permissions for plot_starter...${NC}"
-download_and_set_permissions() {
+# Function to download madmax binaries
+download_madmax() {
     local file_url="$1"
     local file_name="$2"
 
@@ -160,74 +165,105 @@ download_and_set_permissions() {
 
         echo -e "${GREEN}${file_name} downloaded and saved to /usr/local/bin/${NC}"
     else
-        echo -e "${GREEN}${file_name} already exists in /usr/local/bin/${NC}"
+        echo -e "${GREEN}${file_name}${NC} already exists in /usr/local/bin/"
     fi
 }
 
-echo -e "${YELLOW}Downloading from https://github.com/madMAx43v3r. Required for plot_starter...${NC}"
-# Direct URL and file names
-download_and_set_permissions "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/cuda-plotter/linux/x86_64/cuda_plot_k32" "cuda_plot_k32"
-download_and_set_permissions "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_copy" "chia_plot_copy"
-download_and_set_permissions "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_sink" "chia_plot_sink"
+# Function to update systemd service files
+update_service_file() {
+    local service_dir="$1"
+    local service_file="$2"
+    local service_path="/etc/systemd/system/${service_file}"
+
+    # Check for the existence of the service file in the system directory
+    if [[ -e "${service_path}" ]]; then
+        # Compare the existing service file with the new one
+        if ! cmp -s "${service_dir}/${service_file}" "${service_path}"; then
+            echo -e "${YELLOW}A modified ${service_file} exists.${NC}"
+            # Ask the user what to do
+            read -p "Do you want to backup the existing file and replace with the new one? [Y/n] " user_decision
+
+            if [[ ! "$user_decision" =~ ^([nN][oO]|[nN])$ ]]; then
+                # Backup the original file
+                mv "${service_path}" "${service_path}.bak"
+                echo -e "${GREEN}Backup created:${NC} ${service_path}/${service_file}.bak"
+
+                # Copy the new service file
+                cp "${service_dir}/${service_file}" "${service_path}"
+                echo -e "${GREEN}${service_file}${NC} has been updated."
+            else
+                echo -e "${RED}Skipping update for${NC} ${service_file}."
+            fi
+        else
+            echo -e "${GREEN}No changes detected in${NC} ${service_file}, ${GREEN}skipping update.${NC}"
+        fi
+    else
+        # If the service file doesn't exist, simply copy it
+        cp "${service_dir}/${service_file}" "${service_path}"
+        echo -e "${GREEN}Installed new ${service_file}.${NC}"
+    fi
+}
+
+# Function to get the current status of a service
+get_service_status() {
+  if systemctl is-enabled --quiet "$1"; then
+    echo "ENABLED"
+  else
+    echo "DISABLED"
+  fi
+}
+
+# Function to prompt for enabling/disabling a service
+prompt_service_action() {
+  local service=$1
+  local description=$2
+  local status=$(get_service_status "$service")
+  echo -e "${YELLOW}Service: $service ($description)${NC}"
+  read -p "Status: $status. Enable service? [Y/n] " enable_response
+  if [[ ! "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
+    echo -e "${GREEN}Enabling $service...${NC}"
+    systemctl enable "$service"
+  elif [[ "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
+    echo -e "${GREEN}Disabling $service...${NC}"
+    systemctl disable "$service"
+  fi
+  echo -e
+}
 
 
-# Copy the systemd services
-echo -e "\n${YELLOW}Copying systemd services...${NC}"
-if [[ -e "gardenmount/garden-mount.service" ]]; then
-  echo -e "\n${YELLOW}Installing garden-mount.service${NC}"
-  cp ./gardenmount/garden-mount.service /etc/systemd/system/
-else
-  echo -e "\n${RED}Error: garden-mount.service not found${NC}"
-  exit 1
-fi
+# Clear the terminal
+clear
+check_root
+print_header
+remove_obsolete_program_names
+install_dependencies
 
-if [[ -e "plotting/plot-starter.service" ]]; then
-  echo -e "${YELLOW}Installing plot-starter.service${NC}"
-  cp ./plotting/plot-starter.service /etc/systemd/system/
-else
-  echo -e "${RED}Error: plot-starter.service not found${NC}"
-  exit 1
-fi
+install_mergerfs
+echo -e "${YELLOW}Downloading madMAx's binaries required for plot-starter https://github.com/madMAx43v3r...${NC}"
+download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/cuda-plotter/linux/x86_64/cuda_plot_k32" "cuda_plot_k32"
+download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_copy" "chia_plot_copy"
+download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_sink" "chia_plot_sink"
 
-if [[ -e "plotting/plotsink.service" ]]; then
-  echo -e "${YELLOW}Installing plotsink.service${NC}"
-  cp ./plotting/plotsink.service /etc/systemd/system/
-else
-  echo -e "${RED}Error: plotsink.service not found${NC}"
-  exit 1
-fi
+create_drectories
+copy_files
 
-
-# Prompt user to enable the systemd service
-echo
-read -p "Do you want to enable the garden-mount service? (Automount drives during boot) [Y/n] " enable_response
-if [[ ! "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
-  echo -e "${YELLOW}Enabling the garden-mount service...${NC}"
-  systemctl daemon-reload
-  systemctl enable garden-mount.service
-fi
-
-
-echo
-read -p "Do you want to enable the plot-starter service? (Start plotting upon boot) [y/N] " enable_response
-if [[ "$enable_response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-  echo -e "\n${YELLOW}Enabling the plot-starter service...${NC}"
-  systemctl daemon-reload
-  systemctl enable plot-starter.service
-fi
-
-echo
-read -p "Do you want to enable the plotsink service? (Start MadMax's Plotsink on port 1337 during boot) [Y/n] " enable_response
-if [[ ! "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
-  echo -e "${YELLOW}Enabling the plotsink service...${NC}"
-  systemctl daemon-reload
-  systemctl enable garden-mount.service
-fi
-
+echo -e "\n${YELLOW}Updating systemd services...${NC}"
+update_service_file "./gardenmount" "garden-mount.service"
+update_service_file "./plotting" "plot-starter.service"
+update_service_file "./plotting" "plotsink.service"
+systemctl daemon-reload
 echo -e
+
+prompt_service_action "garden-mount.service" "Automount drives during boot"
+prompt_service_action "plot-starter.service" "Start plotting upon boot"
+prompt_service_action "plotsink.service" "Start MadMax's Plotsink on port 1337 during boot"
+
+
+#enable_service "garden-mount.service" "garden-mount service (Automount drives during boot)" "Y"
+#enable_service "plot-starter.service" "plot-starter service (Start plotting upon boot)" "N"
+#enable_service "plotsink.service" "plotsink service (Start MadMax's Plotsink on port 1337 during boot)" "Y"
+
 echo -e "${BOLD}${GREEN}ChiaGarden installation complete!${NC}"
 echo -e "Please read the README.md files for more information on how to use ChiaGarden.\n"
 echo -e "${YELLOW}You may want to start by using chiainit to initialize your drives.${NC}\n"
-
-/usr/local/bin/chiainit --help
 echo
