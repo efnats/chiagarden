@@ -273,21 +273,30 @@ data_written() {
     seconds_per_plot_last_quarter=$(awk -v plots="$plot_files_last_quarter" -v period="$((3 * 30 * 24 * 3600))" 'BEGIN {if (plots > 0) print int((period/plots) + 0.5)}')
     seconds_per_plot_last_year=$(awk -v plots="$plot_files_last_year" -v period="$((365 * 24 * 3600))" 'BEGIN {if (plots > 0) print int((period/plots) + 0.5)}')
 
+    # write_speed_last_xx (in MB/s)
+    write_speed_last_minute=$(awk -v data="$written_data_last_minute" 'BEGIN {print (data * 1024 * 1024)/60}')
+    write_speed_last_hour=$(awk -v data="$written_data_last_hour" 'BEGIN {print (data * 1024 * 1024)/3600}')
+    write_speed_last_day=$(awk -v data="$written_data_last_day" 'BEGIN {print (data * 1024 * 1024)/(24 * 3600)}')
+    write_speed_last_week=$(awk -v data="$written_data_last_week" 'BEGIN {print (data * 1024 * 1024)/(7 * 24 * 3600)}')
+    write_speed_last_month=$(awk -v data="$written_data_last_month" 'BEGIN {print (data * 1024 * 1024)/(4 * 7 * 24 * 3600)}')
+    write_speed_last_quarter=$(awk -v data="$written_data_last_quarter" 'BEGIN {print (data * 1024 * 1024)/(3 * 30 * 24 * 3600)}')
+    write_speed_last_year=$(awk -v data="$written_data_last_year" 'BEGIN {print (data * 1024 * 1024)/(365 * 24 * 3600)}')
+
     # Print the table header
     echo
     echo
     echo -e "${GREEN}Data written${RESET}"
-    printf "%-5s %11s %12s %12s\n" "Period" "Plots" "TiB" "Sec/Plot"
-    printf "============================================\n"
+    printf "%-5s %11s %12s %12s %10s\n" "Period" "Plots" "TiB" "Sec/Plot" "MB/s"
+    printf "=======================================================\n"
 
-    # Print the number of plot files, the amount of data written, and seconds/plot for each time period
-    printf "Minute %11s %12s %12s\n" "$plot_files_last_minute" "$written_data_last_minute" "$seconds_per_plot_last_minute"
-    printf "Hour   %11s %12s %12s\n" "$plot_files_last_hour" "$written_data_last_hour" "$seconds_per_plot_last_hour"
-    printf "Day    %11s %12s %12s\n" "$plot_files_last_day" "$written_data_last_day" "$seconds_per_plot_last_day"
-    printf "Week   %11s %12s %12s\n" "$plot_files_last_week" "$written_data_last_week" "$seconds_per_plot_last_week"
-    printf "Month  %11s %12s %12s\n" "$plot_files_last_month" "$written_data_last_month" "$seconds_per_plot_last_month"
-    printf "Quarter%11s %12s %12s\n" "$plot_files_last_quarter" "$written_data_last_quarter" "$seconds_per_plot_last_quarter"
-    printf "Year   %11s %12s %12s\n" "$plot_files_last_year" "$written_data_last_year" "$seconds_per_plot_last_year"
+    # Print the number of plot files, the amount of data written, seconds/plot, and write speed for each time period
+    printf "Minute %11s %12s %12s %10.2f\n" "$plot_files_last_minute" "$written_data_last_minute" "$seconds_per_plot_last_minute" "$write_speed_last_minute"
+    printf "Hour   %11s %12s %12s %10.2f\n" "$plot_files_last_hour" "$written_data_last_hour" "$seconds_per_plot_last_hour" "$write_speed_last_hour"
+    printf "Day    %11s %12s %12s %10.2f\n" "$plot_files_last_day" "$written_data_last_day" "$seconds_per_plot_last_day" "$write_speed_last_day"
+    printf "Week   %11s %12s %12s %10.2f\n" "$plot_files_last_week" "$written_data_last_week" "$seconds_per_plot_last_week" "$write_speed_last_week"
+    printf "Month  %11s %12s %12s %10.2f\n" "$plot_files_last_month" "$written_data_last_month" "$seconds_per_plot_last_month" "$write_speed_last_month"
+    printf "Quarter%11s %12s %12s %10.2f\n" "$plot_files_last_quarter" "$written_data_last_quarter" "$seconds_per_plot_last_quarter" "$write_speed_last_quarter"
+    printf "Year   %11s %12s %12s %10.2f\n" "$plot_files_last_year" "$written_data_last_year" "$seconds_per_plot_last_year" "$write_speed_last_year"
 }
 
 
