@@ -197,6 +197,7 @@ update_service_file() {
         else
             echo -e "${GREEN}No changes detected in${NC} ${service_file}, ${GREEN}skipping update.${NC}"
         fi
+        echo
     else
         # If the service file doesn't exist, simply copy it
         cp "${service_dir}/${service_file}" "${service_path}"
