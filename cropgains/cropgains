@@ -123,9 +123,13 @@ def get_energy_details(ip_address):
         return None, None, None
     
 def compute_last_24h_energy(energy_yesterday, energy_today):
-    current_hour = datetime.now().hour
-    today_proportion = (current_hour / 24) * energy_today
-    yesterday_proportion = ((24 - current_hour) / 24) * energy_yesterday
+    current_time = datetime.now()
+    minutes_today = current_time.hour * 60 + current_time.minute
+    minutes_yesterday = (24 * 60) - minutes_today
+    
+    today_proportion = (minutes_today / (24 * 60)) * energy_today
+    yesterday_proportion = (minutes_yesterday / (24 * 60)) * energy_yesterday
+    
     return today_proportion + yesterday_proportion
 
 def get_chia_price():
@@ -297,9 +301,12 @@ if __name__ == "__main__":
     total_cost = compute_electricity_cost_in_usd(total_energy)
     yesterday_cost = compute_electricity_cost_in_usd(total_energy_yesterday)
 
+    # Compute total power draw
+    last_24h_energy = compute_last_24h_energy(energy_yesterday, energy_today)
+
     # Print Energy Table
     #print_energy_table(devices_ip, energy_totals, energy_yesterdays, power_draws, total_cost, yesterday_cost)
-    print_energy_table(energy_totals, energy_yesterdays, power_draws, total_cost, yesterday_cost)
+    print_energy_table(energy_totals, last_24h_energy, power_draws, total_cost, yesterday_cost)
 
 
     profit_24h = reward_24h_usd - yesterday_cost
