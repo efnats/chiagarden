@@ -1,53 +1,129 @@
 #!/bin/bash
 
-# Initialize default value for last
-last=30
+# This script will parse the plot-starter logs and calculate the average time for each phase and total time for the last n minutes.
 
-# Parse command line arguments
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        --last)
-        last="$2"
-        shift # past argument
-        shift # past value
-        ;;
-        --last=*)
-        last="${1#*=}"
-        shift # past argument=value
-        ;;
-        *)
-        shift # past unknown option
-        ;;
-    esac
-done
+# Add color variables and bold
+GREEN="\033[32m"
+YELLOW="\033[33m"
+CYAN="\033[36m"
+RED="\033[31m"
+BOLD="\033[1m"
+NC="\033[0m"
 
+## Function to parse command line arguments
+parse_args() {
+    local last=30 # Initialize default value for last
 
-# Extract lines from the last $last minutes of the plot-starter logs that contain the creation times
-data=$(journalctl --since "$last minutes ago" -u plot-starter | grep "Total plot creation time was" | awk '{print $11}')
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --last)
+                last="$2"
+                shift # past argument
+                shift # past value
+                ;;
+            --last=*)
+                last="${1#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                shift # past unknown option
+                ;;
+        esac
+    done
 
-count=0
-total=0
+    echo $last
+}
 
-# Process each time and calculate the sum and count
-for time in $data; do
-    # Ensure the extracted time is a valid number
-    if [[ $time =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-        total=$(echo "$total + $time" | bc)
-        ((count++))
+# Function to extract total plot time and phase times
+extract_total_plot_time() {
+    local last_minutes=$1
+    journalctl --since "$last_minutes minutes ago" -u plot-starter | grep -E "Compression Level:|Total plot creation time was|Phase [1-4] took"
+}
+
+# Function to process log data
+process_log_data() {
+    local data="$1"
+    declare -A total_plot_times phase1_times phase2_times phase3_times phase4_times count_times
+    local compression_level plot_time phase_time
+
+    compression_level=""
+
+    while read -r line; do
+        if [[ $line =~ Compression\ Level:\ (.+) ]]; then
+            compression_level="${BASH_REMATCH[1]}"
+        elif [[ $line =~ Total\ plot\ creation\ time\ was\ ([0-9.]+)\ sec ]] && [ ! -z "$compression_level" ]; then
+            plot_time="${BASH_REMATCH[1]}"
+            total_plot_times[$compression_level]=$(echo "${total_plot_times[$compression_level]:-0} + $plot_time" | bc -l)
+            ((count_times[$compression_level]++))
+        elif [[ $line =~ Phase\ ([1-4])\ took\ ([0-9.]+)\ sec ]] && [ ! -z "$compression_level" ]; then
+            phase_time="${BASH_REMATCH[2]}"
+            case "${BASH_REMATCH[1]}" in
+                1) phase1_times[$compression_level]=$(echo "${phase1_times[$compression_level]:-0} + $phase_time" | bc -l) ;;
+                2) phase2_times[$compression_level]=$(echo "${phase2_times[$compression_level]:-0} + $phase_time" | bc -l) ;;
+                3) phase3_times[$compression_level]=$(echo "${phase3_times[$compression_level]:-0} + $phase_time" | bc -l) ;;
+                4) phase4_times[$compression_level]=$(echo "${phase4_times[$compression_level]:-0} + $phase_time" | bc -l) ;;
+            esac
+        fi
+    done <<< "$data"
+
+    for key in "${!total_plot_times[@]}"; do
+        echo "$key:${total_plot_times[$key]}:${phase1_times[$key]}:${phase2_times[$key]}:${phase3_times[$key]}:${phase4_times[$key]}:${count_times[$key]}"
+    done
+}
+
+# Function to display the results in specified format
+display_results() {
+    local data="$1"
+    declare -A total_plot_times phase1_times phase2_times phase3_times phase4_times count_times
+    local key total_time phase1_time phase2_time phase3_time phase4_time count
+
+    for entry in $data; do
+        IFS=':' read -r key total_time phase1_time phase2_time phase3_time phase4_time count <<< "$entry"
+        total_plot_times[$key]=$total_time
+        phase1_times[$key]=$phase1_time
+        phase2_times[$key]=$phase2_time
+        phase3_times[$key]=$phase3_time
+        phase4_times[$key]=$phase4_time
+        count_times[$key]=$count
+    done
+
+    if [ ${#count_times[@]} -eq 0 ]; then
+        echo "No plots found."
+        return
     fi
-done
 
-# If no plots were found, exit
-if [ $count -eq 0 ]; then
-    echo "No plots found in the last $last minutes."
-    exit 0
-fi
+    for level in "${!total_plot_times[@]}"; do
+        clear
+        echo "Chiagarden plot_timer"
+        echo
+        echo -e "${CYAN}Average times for${NC} $count ${CYAN}plots in the last${NC} $last ${CYAN}minutes${NC}"
+        echo
+        echo -e "${GREEN}Compression Level:${NC} $level"
+        printf "%-14s %7s %9s\n" "Phase" "Seconds" "Minutes"
+        printf "================================\n"
+        calculate_and_print_average "Phase 1" ${phase1_times[$level]} ${count_times[$level]}
+        calculate_and_print_average "Phase 2" ${phase2_times[$level]} ${count_times[$level]}
+        calculate_and_print_average "Phase 3" ${phase3_times[$level]} ${count_times[$level]}
+        calculate_and_print_average "Phase 4" ${phase4_times[$level]} ${count_times[$level]}
+        printf "================================\n"
+        calculate_and_print_average "Total Time" ${total_plot_times[$level]} ${count_times[$level]}
+        echo
+    done
+}
 
-# Calculate the average
-averageseconds=$(echo "scale=2; $total/$count" | bc)
-averageminutes=$(echo "scale=2; $averageseconds/60" | bc)
+calculate_and_print_average() {
+    local phase=$1
+    local total_time=$2
+    local count=$3
+    local average_seconds=$(echo "scale=2; $total_time/$count" | bc -l)
+    local average_minutes=$(echo "scale=2; $average_seconds/60" | bc -l)
+    printf "%-14s %7.2f %9.2f\n" "$phase" "$average_seconds" "$average_minutes"
+}
 
-echo "Avg plot creation time"
-echo "last $last minutes"
-echo
-echo "$averageseconds seconds | $averageminutes minutes"
+
+# Main script execution
+last=$(parse_args "$@")
+echo "Extracting data for the last $last minutes"
+log_data=$(extract_total_plot_time $last)
+processed_data=$(process_log_data "$log_data")
+display_results "$processed_data"
