@@ -115,6 +115,8 @@ process_transfer_data() {
 display_header() {
     local total_count=$1
     echo -e "${CYAN}Created${RESET} $total_count ${CYAN}plots in the last${RESET} $last ${CYAN}minutes${RESET}"
+    echo
+    echo -e "${GREEN}Average${RESET}"
 }
 
 
@@ -155,16 +157,14 @@ display_plotting_results() {
     fi
 
     for level in "${!total_plot_times[@]}"; do
-        echo
-        echo -e "${GREEN}Compression Level:${RESET} $level"
-        printf "%-14s %7s %9s\n" "Phase" "Seconds" "Minutes"
+        printf "%-14s %7s %9s\n" "$level" "Seconds" "Minutes"
         printf "================================\n"
         calculate_plot_avg "Phase 1" ${phase1_times[$level]} ${count_times[$level]}
         calculate_plot_avg "Phase 2" ${phase2_times[$level]} ${count_times[$level]}
         calculate_plot_avg "Phase 3" ${phase3_times[$level]} ${count_times[$level]}
         calculate_plot_avg "Phase 4" ${phase4_times[$level]} ${count_times[$level]}
         printf "================================\n"
-        calculate_plot_avg "Total Time" ${total_plot_times[$level]} ${count_times[$level]}
+        calculate_plot_avg "Total Avg" ${total_plot_times[$level]} ${count_times[$level]}
         echo
     done
 }
@@ -188,8 +188,9 @@ display_transfer_results() {
     fi
 
     # Display the results
-    printf "${CYAN}%-20s${RESET} %7.2f %s\n" "Data Transferred" "$total_mib" "$unit"
-    printf "${CYAN}%-20s${RESET} %7.2f MB/s\n" "Average Speed" "$average_speed"
+    echo -e "${GREEN}Total${RESET}"
+    printf "%-20s ${CYAN}%7.2f${RESET} %s\n" "Data Transferred" "$total_mib" "$unit"
+    printf "%-20s${RESET} ${CYAN}%7.2f${RESET} MB/s\n" "Average Speed" "$average_speed"
 }
 
 
