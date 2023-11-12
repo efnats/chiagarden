@@ -224,6 +224,7 @@ if __name__ == "__main__":
 
     print(f"{Fore.CYAN}{'Date':<{label_width}}{Fore.WHITE}{datetime.now().strftime('%d/%m/%Y'):<{value_width}}")
     print(f"{Fore.CYAN}{'Wallet Address':<{label_width}}{Fore.WHITE}{wallet_address:<{value_width}}")
+    #print(f"{Fore.CYAN}{'Wallet Address':<{label_width}}{Fore.WHITE}<not shown>")
     print(f"{Fore.CYAN}{'Energy [USD/kWh]':<{label_width}}{Fore.WHITE}{electricity_price_usd:.2f} USD")
 
 
