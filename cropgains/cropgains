@@ -7,44 +7,123 @@ import os
 from datetime import datetime
 from colorama import init, Fore, Style
 
+# Constants
+CONFIG_PATHS = [
+    "/etc/chiagarden/cropgains.config",
+    os.path.expanduser("~/.config/chiagarden/cropgains.config"),
+    "cropgains.config"
+]
+CHIA_WALLET_API_URL = "https://xchscan.com/api/account/txns?address={}"
+CHIA_PRICE_API_URL = "https://api.coingecko.com/api/v3/simple/price?ids=chia&vs_currencies=usd"
+CHIA_NETSPACE_API_URL = "https://xchscan.com/api/netspace"
+SECONDS_IN_A_DAY = 86400
+SECONDS_IN_A_WEEK = 604800
+SECONDS_IN_30_DAYS = 2592000
 
 # Initialize colorama
 init(autoreset=True)
 
-# Read the configuration file
-config = configparser.ConfigParser()
-config.read('cropgains.config')
+def clear_terminal():
+    # For Windows
+    if os.name == 'nt':
+        os.system('cls')
+    # For macOS and Linux (os.name: 'posix')
+    else:
+        os.system('clear')
 
-# Potential paths for the config file
-config_paths = [
-    "/etc/chiagarden/cropgains.config",
-    os.path.expanduser("~/.config/chiagarden/cropgains.config"),
-    "cropgains.cfg"  # Add current working directory as a search path
-]
+def print_bold(text):
+    BOLD = '\033[1m'
+    END = '\033[0m'
+    print(BOLD + text + END)        
 
-# Read the first available config file
-config_loaded = False
-for path in config_paths:
-    if os.path.exists(path):
-        config.read(path)
-        config_loaded = True
-        break
-
-if not config_loaded:
-    print(Fore.RED + "Config file cropgains.config not found in any of the specified paths /etc/chiagarden ~/chiagarden/ or ./!")
+def load_config():
+    """
+    Load configuration from the first available file in CONFIG_PATHS.
+    """
+    config = configparser.ConfigParser()
+    for path in CONFIG_PATHS:
+        if os.path.exists(path):
+            config.read(path)
+            return config
+    print(Fore.RED + "Config file not found in any of the specified paths.")
     exit(1)
 
+def get_chia_received(wallet_address):
+    current_time = int(time.time())
+    time_24_hours_ago = current_time - SECONDS_IN_A_DAY
+    time_7_days_ago = current_time - SECONDS_IN_A_WEEK
+    time_30_days_ago = current_time - SECONDS_IN_30_DAYS
 
-# Get values from the configuration file
-wallet_address = config['DEFAULT']['WALLET_ADDRESS']
-electricity_price_usd = float(config.get('DEFAULT', 'ELECTRICITY_PRICE_USD'))
+    url = CHIA_WALLET_API_URL.format(wallet_address)
+    response = requests.get(url)
+    data = response.json()
+
+    total_received_24_hours = 0
+    total_received_7_days = 0
+    total_received_30_days = 0
+
+    for txn in data['txns']:
+        if txn['to'] == wallet_address:
+            txn_amount = txn['amount'] / 1000000000000
+            if txn['timestamp'] > time_24_hours_ago:
+                total_received_24_hours += txn_amount
+            if txn['timestamp'] > time_7_days_ago:
+                total_received_7_days += txn_amount
+            if txn['timestamp'] > time_30_days_ago:
+                total_received_30_days += txn_amount
+
+    return total_received_24_hours, total_received_7_days, total_received_30_days
+
+def get_chia_price():
+    try:
+        response = requests.get(CHIA_PRICE_API_URL)
+        response.raise_for_status()
+        data = response.json()
+        return data["chia"]["usd"]
+    except requests.RequestException as e:
+        print(f"Failed to fetch Chia price. Error: {e}")
+        return None
+
+def get_chia_netspace():
+    try:
+        response = requests.get(CHIA_NETSPACE_API_URL)
+        response.raise_for_status()
+        data = response.json()
+        netspace = float(data['netspace'])
+        return netspace
+    except requests.RequestException as e:
+        print(f"An error occurred while fetching Chia netspace: {e}")
+        return None
+
+def get_energy_details(ip_address):
+    url = f"http://{ip_address}/cm?cmnd=Status%208"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        energy_total = data.get('StatusSNS', {}).get('ENERGY', {}).get('Total')
+        energy_yesterday = data.get('StatusSNS', {}).get('ENERGY', {}).get('Yesterday')
+        energy_today = data.get('StatusSNS', {}).get('ENERGY', {}).get('Today')  # Get EnergyToday
+        
+        if energy_total is not None and energy_yesterday is not None and energy_today is not None:
+            return energy_total, energy_yesterday, energy_today
+        else:
+            raise ValueError("Energy details not found in the response.")
+    except requests.RequestException as e:
+        print(f"Failed to fetch data from {ip_address}. Error: {e}")
+        return None, None, None
+
+def compute_last_24h_energy(energy_yesterday, energy_today):
+    current_hour = datetime.now().hour
+    today_proportion = (current_hour / 24) * energy_today
+    yesterday_proportion = ((24 - current_hour) / 24) * energy_yesterday
+    return today_proportion + yesterday_proportion
 
 def compute_electricity_cost_in_usd(kWh):
     return kWh * electricity_price_usd
 
 def compute_power_draw(energy_yesterday_kWh):
     return (energy_yesterday_kWh / 24) * 1000  # Convert kWh to watts and divide by 24 hours
-
 
 def print_energy_table(energy_totals, energy_yesterdays, power_draws, total_cost, yesterday_cost):
 
@@ -75,87 +154,6 @@ def print_energy_table(energy_totals, energy_yesterdays, power_draws, total_cost
     print_row(["COST (USD)", f"${total_cost:.2f}", f"${yesterday_cost:.2f}", "-"], column_widths)  # No cost for power
     print()
 
-
-def get_chia_received():
-    current_time = int(time.time())
-    time_24_hours_ago = current_time - 86400
-    time_7_days_ago = current_time - 604800
-    time_30_days_ago = current_time - 2592000
-
-    url = f"https://xchscan.com/api/account/txns?address={wallet_address}"
-    response = requests.get(url)
-    data = response.json()
-
-    total_received_24_hours = 0
-    total_received_7_days = 0
-    total_received_30_days = 0
-
-    for txn in data['txns']:
-        if txn['to'] == wallet_address:
-            txn_amount = txn['amount'] / 1000000000000
-            if txn['timestamp'] > time_24_hours_ago:
-                total_received_24_hours += txn_amount
-            if txn['timestamp'] > time_7_days_ago:
-                total_received_7_days += txn_amount
-            if txn['timestamp'] > time_30_days_ago:
-                total_received_30_days += txn_amount
-
-    return total_received_24_hours, total_received_7_days, total_received_30_days
-
-
-
-def get_energy_details(ip_address):
-    url = f"http://{ip_address}/cm?cmnd=Status%208"
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        energy_total = data.get('StatusSNS', {}).get('ENERGY', {}).get('Total')
-        energy_yesterday = data.get('StatusSNS', {}).get('ENERGY', {}).get('Yesterday')
-        energy_today = data.get('StatusSNS', {}).get('ENERGY', {}).get('Today')  # Get EnergyToday
-        
-        if energy_total is not None and energy_yesterday is not None and energy_today is not None:
-            return energy_total, energy_yesterday, energy_today
-        else:
-            raise ValueError("Energy details not found in the response.")
-    except requests.RequestException as e:
-        print(f"Failed to fetch data from {ip_address}. Error: {e}")
-        return None, None, None
-    
-def compute_last_24h_energy(energy_yesterday, energy_today):
-    current_time = datetime.now()
-    minutes_today = current_time.hour * 60 + current_time.minute
-    minutes_yesterday = (24 * 60) - minutes_today
-    
-    today_proportion = (minutes_today / (24 * 60)) * energy_today
-    yesterday_proportion = (minutes_yesterday / (24 * 60)) * energy_yesterday
-    
-    return today_proportion + yesterday_proportion
-
-def get_chia_price():
-    url = "https://api.coingecko.com/api/v3/simple/price?ids=chia&vs_currencies=usd"
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        return data["chia"]["usd"]
-    except requests.RequestException as e:
-        print(f"Failed to fetch Chia price. Error: {e}")
-        return None
-
-def get_chia_netspace():
-    url = "https://xchscan.com/api/netspace"
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        netspace = float(data['netspace'])
-        return netspace
-    except requests.RequestException as e:
-        print(f"An error occurred while fetching Chia netspace: {e}")
-        return None
-
-
 def print_table(headers, rows):
     """
     Print a table with given headers and rows.
@@ -178,7 +176,11 @@ def print_table(headers, rows):
     print()  # Extra newline for better output spacing
 
 if __name__ == "__main__":
-    received_24h, received_7d, received_30d = get_chia_received()
+    config = load_config()
+    wallet_address = config['DEFAULT']['WALLET_ADDRESS']
+    electricity_price_usd = float(config.get('DEFAULT', 'ELECTRICITY_PRICE_USD'))
+
+    received_24h, received_7d, received_30d = get_chia_received(wallet_address)
     xch_price = get_chia_price()
 
     chia_netspace = get_chia_netspace()
@@ -187,70 +189,84 @@ if __name__ == "__main__":
     
     # Constants definitions
     block_time = 18.75  # Average time for a block in seconds
-    blocks_per_day = 86400 / block_time  # Number of blocks found per day
+    blocks_per_day = SECONDS_IN_A_DAY / block_time  # Number of blocks found per day
     block_reward = 2  # XCH reward per block
     farmers_reward_xch = blocks_per_day * block_reward  # Total XCH rewarded to farmers per day
     farmers_reward_usd = farmers_reward_xch * xch_price  # Total USD value of XCH rewarded to farmers per day
-    uncompressed_plot_size_GiB = 101.3  # Size of an uncompressed plot in GiB
+    uncompressed_plot_size_GiB = 101.4  # Size of an uncompressed plot in GiB
     uncompressed_plot_size_TiB = uncompressed_plot_size_GiB / 1024  # Convert GiB to TiB
+    uncompressed_plot_size_PiB = uncompressed_plot_size_TiB / 1024  # Convert TiB to PiB
     chia_netspace_TiB = float(chia_netspace) / 1100000000000  # Convert the netspace from bytes to TiB
-    assumed_plots_in_netspace = chia_netspace_TiB / uncompressed_plot_size_TiB  # Calculate the number of plots
-    reward_per_plot_xch = farmers_reward_xch / assumed_plots_in_netspace
-    reward_per_plot_usd = farmers_reward_usd / assumed_plots_in_netspace
+    plots_in_netspace = chia_netspace_TiB / uncompressed_plot_size_TiB  # Calculate the number of plots
+    reward_per_plot_xch = farmers_reward_xch / plots_in_netspace
+    reward_per_plot_usd = farmers_reward_usd / plots_in_netspace
 
     reward_24h_usd = received_24h * xch_price
     reward_7d_usd = received_7d * xch_price
     reward_30d_usd = received_30d * xch_price
 
     # Calculate the shouldbe_Plots for each time period
-    shouldbe_Plots_24h = received_24h / reward_per_plot_xch
-    shouldbe_Plots_7d = received_7d / reward_per_plot_xch / 7
-    shouldbe_Plots_30d = received_30d / reward_per_plot_xch / 30
+    should_be_plots_24h = round(received_24h / reward_per_plot_xch)
+    should_be_plots_7d = round(received_7d / reward_per_plot_xch / 7)
+    should_be_plots_30d = round(received_30d / reward_per_plot_xch / 30)
 
 
+    clear_terminal()
+    print_bold(Fore.WHITE + "Chiagarden cropgains")
     print()
     print(Fore.YELLOW + "=" * 40)
     print(Fore.YELLOW + "CHIA PROFIT & ENERGY COST REPORT".center(40))
     print(Fore.YELLOW + "=" * 40)
+    print()
 
-    print(Fore.CYAN + f"\nDate: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-    print(Fore.CYAN + f"Wallet Address: {wallet_address}")
-    #print(Fore.CYAN + f"Wallet Address: not shown")
-    print(Fore.CYAN + f"Electricity price [USD/kWh]: ${electricity_price_usd:.2f}\n")
+    label_width = 20  # Adjust based longest label
+    value_width = 40  # Adjust based on longest value
 
-    # Your previous code to calculate rewards and display information
-    # ...
+    print(f"{Fore.CYAN}{'Date':<{label_width}}{Fore.WHITE}{datetime.now().strftime('%d/%m/%Y'):<{value_width}}")
+    print(f"{Fore.CYAN}{'Wallet Address':<{label_width}}{Fore.WHITE}{wallet_address:<{value_width}}")
+    print(f"{Fore.CYAN}{'Energy [USD/kWh]':<{label_width}}{Fore.WHITE}{electricity_price_usd:.2f} USD")
 
-    print(Fore.CYAN + f"Price XCH: ${xch_price:.2f} USD")
-    print(Fore.CYAN + f"Chia Netspace: {chia_netspace_EiB:.2f} EiB")
-    #print(Fore.CYAN + f"Chia Netspace: {chia_netspace_TiB:.2f} TiB")
-    #print(Fore.CYAN + f"Block Time: {block_time} seconds")
-    #print(Fore.CYAN + f"Blocks per Day: {blocks_per_day:.2f}")
-    #print(Fore.CYAN + f"Block Reward: {block_reward} XCH")
-    #print(Fore.CYAN + f"Total Farmers' Reward per Day: {farmers_reward_xch:.2f} XCH")
-    #print(Fore.CYAN + f"Total Farmers' Reward per Day (USD): ${farmers_reward_usd:.2f}")
-    print(Fore.CYAN + f"Assumed Plots in Netspace: {assumed_plots_in_netspace:.0f}")
-    #print(Fore.CYAN + f"Uncompressed Plot Size: {uncompressed_plot_size_GiB} GiB")
-    #print(Fore.CYAN + f"Uncompressed Plot Size: {uncompressed_plot_size_TiB:.3f} TiB")
-    print(Fore.CYAN + f"Reward per Plot: {reward_per_plot_xch:.6f} XCH")
-    #print(Fore.CYAN + f"Reward per Plot: {reward_per_plot_usd:.6f} USD")
+
+    print(f"{Fore.CYAN}{'Price XCH':<{label_width}}{Fore.WHITE}{xch_price:.2f} USD".ljust(value_width))
+    print(f"{Fore.CYAN}{'Chia Netspace':<{label_width}}{Fore.WHITE}{chia_netspace_EiB:.2f} EiB".ljust(value_width))
+    print(f"{Fore.CYAN}{'Plots in Netspace':<{label_width}}{Fore.WHITE}{int(plots_in_netspace):<{value_width}}")
+    print(f"{Fore.CYAN}{'Reward/plot day':<{label_width}}{Fore.WHITE}{reward_per_plot_xch:.6f} XCH".ljust(value_width))
+
+
+    # Unused print statements
+    # print(f"{Fore.CYAN}{'Electricity price [USD/kWh]':<{label_width}}{Fore.WHITE}{electricity_price_usd:.2f} USD".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Price XCH':<{label_width}}{Fore.WHITE}{xch_price:.2f} USD".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Chia Netspace':<{label_width}}{Fore.WHITE}{chia_netspace_EiB:.2f} EiB".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Chia Netspace TiB':<{label_width}}{Fore.WHITE}{chia_netspace_TiB:.2f} TiB".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Block Time':<{label_width}}{Fore.WHITE}{block_time} seconds".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Blocks per Day':<{label_width}}{Fore.WHITE}{blocks_per_day:.2f}".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Block Reward':<{label_width}}{Fore.WHITE}{block_reward} XCH".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Total Farmers' Reward per Day XCH':<{label_width}}{Fore.WHITE}{farmers_reward_xch:.2f} XCH".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Total Farmers' Reward per Day USD':<{label_width}}{Fore.WHITE}{farmers_reward_usd:.2f}".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Plots in Netspace':<{label_width}}{Fore.WHITE}{plots_in_netspace:<{value_width}}")
+    # print(f"{Fore.CYAN}{'Uncompressed Plot Size GiB':<{label_width}}{Fore.WHITE}{uncompressed_plot_size_GiB} GiB".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Uncompressed Plot Size TiB':<{label_width}}{Fore.WHITE}{uncompressed_plot_size_TiB:.3f} TiB".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Reward plot/day':<{label_width}}{Fore.WHITE}{reward_per_plot_xch:.6f} XCH".ljust(value_width))
+    # print(f"{Fore.CYAN}{'Reward plot/day USD':<{label_width}}{Fore.WHITE}{reward_per_plot_usd:.6f} USD".ljust(value_width))
 
 
 
     # Table for XCH and USD
     print()
-    print(Fore.MAGENTA + "REWARDS")
+    print(Fore.GREEN + "REWARDS")
 
-    table_header = ["Period", "XCH", "USD", "Should-be Plots"]
-    table_rows = [
-        ["24 hours", f"{received_24h:.3f}", f"${reward_24h_usd:.2f}", f"{shouldbe_Plots_24h:.2f}"],
-        ["07 days", f"{received_7d:.3f}", f"${reward_7d_usd:.2f}", f"{shouldbe_Plots_7d:.2f}"],
-        ["30 days", f"{received_30d:.3f}", f"${reward_30d_usd:.2f}", f"{shouldbe_Plots_30d:.2f}"]
-    ]
+    table_header = ["Period", "XCH", "USD", "equiv Plots", "eff Size (TiB)"]
+    table_rows = []
+    for period, xch, usd, plots in [
+        ("24 hours", f"{received_24h:.3f}", f"${reward_24h_usd:.2f}", should_be_plots_24h),
+        ("07 days", f"{received_7d:.3f}", f"${reward_7d_usd:.2f}", should_be_plots_7d),
+        ("30 days", f"{received_30d:.3f}", f"${reward_30d_usd:.2f}", should_be_plots_30d)
+    ]:
+        eff_size_TiB = plots * uncompressed_plot_size_TiB
+        table_rows.append([period, xch, usd, f"{plots}", f"{eff_size_TiB:.2f}"])
+
     print_table(table_header, table_rows)
 
-    #devices = {k:v for k, v in config['DEVICES'].items() if not config.has_option('DEFAULT', k)}
-    #devices_ip = {k:v for k, v in config['DEVICES_IP'].items() if not config.has_option('DEFAULT', k)}
     devices_ip = {k: v for k, v in config['DEVICES_IP'].items() if not config.has_option('DEFAULT', k)}
     devices_power_draw = {k: float(v) for k, v in config['DEVICES_POWER_DRAW'].items() if not config.has_option('DEFAULT', k)}
 
@@ -260,19 +276,6 @@ if __name__ == "__main__":
     energy_totals = {}
     energy_yesterdays = {}
     power_draws = {}
-    
-    # for name, ip in devices_ip.items():
-    #     energy_total, energy_yesterday = get_energy_details(ip)
-    #     if energy_total is not None:
-    #         total_energy += energy_total
-    #         energy_totals[name] = energy_total
-    #     if energy_yesterday is not None:
-    #         total_energy_yesterday += energy_yesterday
-    #         energy_yesterdays[name] = energy_yesterday
-    #         power_draw = compute_power_draw(energy_yesterday)  # Compute power draw
-    #         power_draws[name] = power_draw
-    #         total_power_draw += power_draw  # Aggregate the power draw
-
     all_devices = set(devices_ip.keys()).union(devices_power_draw.keys())
 
     for name in all_devices:
@@ -301,20 +304,22 @@ if __name__ == "__main__":
     total_cost = compute_electricity_cost_in_usd(total_energy)
     yesterday_cost = compute_electricity_cost_in_usd(total_energy_yesterday)
 
-    # Compute total power draw
-    last_24h_energy = compute_last_24h_energy(energy_yesterday, energy_today)
+    # Calculate profits
+    profit_24h = reward_24h_usd - yesterday_cost
+    profit_color = Fore.GREEN if profit_24h > 0 else Fore.RED
+    weekly_profit = profit_24h * 7
+    monthly_profit = profit_24h * 30
+    yearly_profit = profit_24h * 365
+    
 
     # Print Energy Table
-    #print_energy_table(devices_ip, energy_totals, energy_yesterdays, power_draws, total_cost, yesterday_cost)
-    print_energy_table(energy_totals, last_24h_energy, power_draws, total_cost, yesterday_cost)
-
-
-    profit_24h = reward_24h_usd - yesterday_cost
-
-    profit_color = Fore.GREEN if profit_24h > 0 else Fore.RED
-    print(Fore.MAGENTA + "PROFIT (Last 24hrs)")
-    print(profit_color + f"reward : ${reward_24h_usd:.2f}")
-    print(profit_color + f"  cost : ${yesterday_cost:.2f}")
-    print(Fore.CYAN + "=" * 15)
-    print(profit_color + f"profit : ${profit_24h:.2f}\n")
+    print_energy_table(energy_totals, energy_yesterdays, power_draws, total_cost, yesterday_cost)
+    print(profit_color + "PROFIT LAST 24H")
+    print(Fore.WHITE + f"Reward : ${reward_24h_usd:.2f}")
+    print(Fore.WHITE + f"Cost   : ${yesterday_cost:.2f}")
+    print(Fore.WHITE + "=" * 19)
+    print(Fore.WHITE + f"last24h  :" + profit_color + f" ${profit_24h:.2f}")
+    print(Fore.WHITE + f"Weekly   :" + profit_color + f" ${weekly_profit:.2f}")
+    print(Fore.WHITE + f"Monthly  :" + profit_color + f" ${monthly_profit:.2f}")
+    print(Fore.WHITE + f"Yearly   :" + profit_color + f" ${yearly_profit:.2f}\n")
     
