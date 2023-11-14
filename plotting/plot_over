@@ -137,9 +137,7 @@ is_running_as_systemd_service() {
 # Function to sleep for the specified interval before repeating the loop
 sleep_interval() {
     echo
-    if ! is_running_as_systemd_service; then
-        echo -e "every ${CYAN}$interval${RESET} seconds"
-    fi
+    echo -e "waiting ${CYAN}$interval${RESET} seconds"
     sleep "$interval"
 }
 
