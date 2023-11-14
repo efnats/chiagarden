@@ -1,0 +1,14 @@
+[Unit]
+Description=Chiagarden plot_over
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/plot_over
+#ExecStart=/usr/local/bin/plot_over
+
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

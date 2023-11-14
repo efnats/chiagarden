@@ -4,13 +4,15 @@
 #   VARIABLES - adjust these to your liking    #
 ################################################
 
-min_free_space=100 # minimum free space in GB
-amount_free_disks=10 # desired amount of disks with min_free_space
+min_free_space="100" # minimum free space in GB
+amount_free_disks="10" # desired amount of disks with min_free_space
 replot_levels="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,18,19,20" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
-search_depth=10 # maximum search depth for plot files - how many subdir levels should we iterate?
-interval=25 # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
+search_depth="10" # maximum search depth for plot files - how many subdir levels should we iterate?
+interval="30" # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
 logfile="/var/log/plot_over.log" # set to a valid path or leave empty to disable logging
-display_search_paths="false"
+display_search_paths="false" # set to true to display the paths that are searched for plot files
+label="CHIA" # Default parameter for your label. Can also be set in commandline.
+subdir="" # Default parameter for your first subdirectory for plots in Disk. Can also be set in commandline.
 ###### No variables to change below ###############
 
 # Add color variables and bold
@@ -21,14 +23,35 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
-label="CHIA"
-
-subdir="" # Default parameter for your first subdirectory for plots in Disk. This is set in the commandline now.
-# add support for Gigahoese 2.x and Bladebit
 plot_patterns=('plot-k32-202*.plot' 'SPECIAL_PATTERN_1' 'SPECIAL_PATTERN_2' 'SPECIAL_PATTERN_3' 'SPECIAL_PATTERN_4' 'SPECIAL_PATTERN_5' 'SPECIAL_PATTERN_6' 'SPECIAL_PATTERN_7' 'SPECIAL_PATTERN_8' 'SPECIAL_PATTERN_9' 'plot-k32-c10-*.plot' 'plot-k32-c11-*.plot' 'plot-k32-c12-*.plot' 'plot-k32-c13-*.plot' 'plot-k32-c14-*.plot' 'plot-k32-c15-*.plot' 'plot-k32-c16-*.plot' 'plot-k32-c17-*.plot' 'plot-k32-c18-*.plot' 'plot-k32-c19-*.plot' 'plot-k32-c20-*.plot')
 min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
 IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
 
+# Configuration file name
+config_file="plot_over.config"
+
+# Function to load configuration from file
+load_config() {
+    while IFS='=' read -r key value; do
+        if [[ "$key" != "" && "$key" != \#* ]]; then
+            # Remove inline comments and trim whitespace
+            value=$(echo "$value" | cut -d'#' -f1 | xargs)
+            eval "$key='$value'"
+        fi
+    done < "$1"
+}
+
+
+# Check and Load Configuration File
+CONFIG_PATHS=("/etc/chiagarden/$config_file" "$HOME/.config/chiagarden/$config_file" "./$config_file")
+
+for path in "${CONFIG_PATHS[@]}"; do
+    if [[ -f "$path" ]]; then
+        echo "Loading configuration from $path"
+        load_config "$path"
+        break
+    fi
+done
 
 # Parse command-line arguments
 dry_run=false
@@ -86,6 +109,40 @@ function print_usage() {
     echo "Note: --mount-dir and --label cannot be used at the same time."
 }
 
+# is_running_as_systemd_service() {
+#     if [ -n "$INVOCATION_ID" ]; then
+#         return 0 # True, running as systemd service
+#     else
+#         return 1 # False, not running as systemd service
+#     fi
+# }
+
+is_running_as_systemd_service() {
+    if [ $(ps -o comm= -p $PPID) = 'systemd' ]; then
+        return 0 # True, running as systemd service
+    else
+        return 1 # False, not running as systemd service
+    fi
+}
+
+# is_running_as_systemd_service() {
+    # if [ "$RUNNING_UNDER_SYSTEMD" = "true" ]; then
+        # return 0 # True, running as systemd service
+    # else
+        # return 1 # False, not running as systemd service
+    # fi
+# }
+
+
+# Function to sleep for the specified interval before repeating the loop
+sleep_interval() {
+    echo
+    if ! is_running_as_systemd_service; then
+        echo -e "every ${CYAN}$interval${RESET} seconds"
+    fi
+    sleep "$interval"
+}
+
 # Check if duf is installed
 function check_duf_installed() {
   if ! command -v duf >/dev/null 2>&1; then
@@ -129,29 +186,6 @@ function find_disks() {
   fi
 }
 
-# Display information about the script's settings and monitored disks
-function display_info() {
-  disk_count="${#disks[@]}"
-
-  if [ -n "$mount_dir" ]; then
-  echo -e "Watching a total of ${CYAN}$disk_count${RESET} drives in ${CYAN}$mount_dir*${RESET}"
-    elif [ -n "$label" ]; then
-  echo -e "Watching a total of ${CYAN}$disk_count${RESET} drives labelled with the pattern ${CYAN}$label${RESET}"
-  fi
-
-  echo -e "${CYAN}$amount_free_disks${RESET} drives each required to have ${CYAN}$min_free_space${RESET} GB free space"
-  echo -e "Plot levels marked for removal: ${CYAN}$replot_levels${RESET}"
-  if [ "$dry_run" = true ]; then
-    echo ""
-    echo -e "${CYAN}DRY-RUN MODE - NOTHING WILL BE DELETED${RESET}"
-    echo ""
-  fi
-  if [ "$display_search_paths" = true ]; then
-  search_path_output
-  fi
-}
-
-
 ## Detailed info about paths to include for searching plot files
 function search_path_output() {
     echo ""
@@ -184,23 +218,6 @@ function get_free_disks() {
     enough_free_disks=false
   fi
 }
-
-
-# Display information about free disks
-function display_free_disks_info() {
-  get_free_disks
-  if [ ${#free_disks[@]} -gt 0 ]; then
-    echo -e "${CYAN}${#free_disks[@]}${RESET} drives meet the requirements:"
-    if check_duf_installed; then
-      duf ${free_disks[@]}
-      echo ""
-    fi
-  else
-      echo "No drives meet the requirements. Marking plots for removal."
-  fi
-}
-
-
 
 
 function find_oldest_plot() {
@@ -238,28 +255,43 @@ function find_oldest_plot() {
 
 # Remove identified plot and log action into logfile
 function remove_oldest_plot() {
-  if [ -n "$oldest_file" ]; then
-    #echo -e "${CYAN}$(date)${RESET}"
-    
-    if [ "$dry_run" = true ]; then
-      echo -e "${CYAN}$(date)${RESET} DRY-RUN would remove $oldest_file"
-    else
-      echo -e "${CYAN}$(date)${RESET} removing $oldest_file"
-      #chattr -i "$oldest_file"
-      rm_output=$(rm -v "$oldest_file" 2>&1)
-      echo -e "${CYAN}$(date)${RESET} $rm_output"
-      
-      if [ -n "$logfile" ]; then
-        echo "$(date) - ${rm_output}" >> "$logfile"
-      fi
-    fi
-    echo
-    plot_removed=true
+    if [ -n "$oldest_file" ]; then
+        # Determine if running as systemd service
+        if is_running_as_systemd_service; then
+            date_prefix=""
+        else
+            date_prefix="${CYAN}$(date)${RESET} "
+        fi
+
+        # Output message
+        if [ "$dry_run" = true ]; then
+            echo -e "${date_prefix}DRY-RUN would remove $oldest_file"
+        else
+            echo -e "${date_prefix}removing $oldest_file"
+            rm_output=$(rm -v "$oldest_file" 2>&1)
+            echo -e "${date_prefix}$rm_output"
+        fi
+
+        # Log to file only if not running as systemd service
+        if ! is_running_as_systemd_service && [ -n "$logfile" ]; then
+            echo "$(date) - ${rm_output}" >> "$logfile"
+        fi
+
+        echo
+        plot_removed=true
     fi
 }
 
+
+
 # Find and remove the oldest plot file based on the provided compression level or skip in certain conditions
 function process_plot_files() {
+  # Determine if running as systemd service
+  if is_running_as_systemd_service; then
+      date_prefix=""
+  else
+      date_prefix="${CYAN}$(date)${RESET} "
+  fi
   get_free_disks
 
   if [ "$enough_free_disks" = false ]; then
@@ -268,7 +300,7 @@ function process_plot_files() {
     while [ "$enough_free_disks" = false ] && [ "$no_matching_plots_found" = false ]; do
       plot_removed=false
 
-      echo -e "${CYAN}$(date)${RESET} Finding next plot for removal.."
+      echo -e "${date_prefix}Finding next plot for removal.."
 
       for level in "${replot_levels_arr[@]}"; do
         if [ "$plot_removed" = false ]; then
@@ -286,24 +318,65 @@ function process_plot_files() {
 
       # If no files with matching plot patterns were found
       if [ $file_count -eq 0 ]; then
-        echo -e "${CYAN}$(date)${RESET} No plot files with matching patterns were found."
+        echo -e "${date_prefix}No plot files with matching patterns were found."
         no_matching_plots_found=true
       fi
     done
   else
-    echo -e "${CYAN}$(date)${RESET} There are enough free disks. No need to remove any plot files."
+    echo -e "${date_prefix}There are enough free disks. No need to remove any plot files."
   fi
 }
 
+# Display information about the script's settings and monitored disks
+function display_info() {
+  disk_count="${#disks[@]}"
+
+  if [ -n "$mount_dir" ]; then
+  echo -e "Watching a total of ${CYAN}$disk_count${RESET} drives in ${CYAN}$mount_dir*${RESET}"
+    elif [ -n "$label" ]; then
+  echo -e "Watching a total of ${CYAN}$disk_count${RESET} drives labelled with the pattern ${CYAN}$label${RESET}"
+  fi
+
+  echo -e "${CYAN}$amount_free_disks${RESET} drives each required to have ${CYAN}$min_free_space${RESET} GB free space"
+  echo -e "Plot levels marked for removal: ${CYAN}$replot_levels${RESET}"
+  echo -e
+  if [ "$dry_run" = true ]; then
+    echo ""
+    echo -e "${CYAN}DRY-RUN MODE - NOTHING WILL BE DELETED${RESET}"
+    echo ""
+  fi
+  if [ "$display_search_paths" = true ]; then
+  search_path_output
+  fi
+}
+
+# Display information about free disks
+function display_free_disks_info() {
+  get_free_disks
+  if [ ${#free_disks[@]} -gt 0 ]; then
+    echo -e "${CYAN}${#free_disks[@]}${RESET} drives meet the requirements"
+    
+    # Execute duf command only if not running as systemd service and duf is installed
+    if ! is_running_as_systemd_service && check_duf_installed; then
+      duf ${free_disks[@]}
+      echo ""
+    fi
+  else
+    echo "No drives meet the requirements. Marking plots for removal.."
+  fi
+}
+
+
 validate_arguments
 find_disks
-
 while true; do
-  clear
-  echo
+  if ! is_running_as_systemd_service; then
+    clear
+    echo -e ${BOLD}Chiagarden plot_over${RESET}
+    echo
+  fi
   display_info
   display_free_disks_info
   process_plot_files
-  echo -e "${CYAN}$(date)${RESET} Waiting $interval seconds"
-  sleep "$interval"
+  sleep_interval
 done
