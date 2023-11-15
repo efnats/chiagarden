@@ -1,7 +1,10 @@
 #!/bin/bash
 
+# Chiagarden plot_timer
 # This script will parse the plot-starter logs and calculate the average time for each phase and total time for the last n minutes.
-interval=60 # Default interval is 60 seconds
+
+
+interval=80 # Default interval is 60 seconds
 
 # Add color variables and bold
 GREEN="\033[32m"
@@ -46,14 +49,24 @@ parse_args() {
                 last="${1#*=}"
                 shift # past argument=value
                 ;;
+            --interval)
+                interval="$2"
+                shift # past argument
+                shift # past value
+                ;;
+            --interval=*)
+                interval="${1#*=}"
+                shift # past argument=value
+                ;;
             *)
                 shift # past unknown option
                 ;;
         esac
     done
 
-    echo $last
+    echo "$last:$interval"
 }
+
 
 # Function to extract total plot time and phase times
 extract_log_data() {
@@ -210,7 +223,8 @@ do
     echo -e ${BOLD}"Chiagarden plot_timer${RESET}"
     echo
     start_spinner
-    last=$(parse_args "$@")
+    
+    IFS=':' read last interval <<< $(parse_args "$@")
 
     # Extract and process plot data
     log_data=$(extract_log_data $last)
