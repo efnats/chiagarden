@@ -252,6 +252,7 @@ echo -e "\n${YELLOW}Updating systemd services...${NC}"
 update_service_file "./gardenmount" "garden-mount.service"
 update_service_file "./plotting" "plot-starter.service"
 update_service_file "./plotting" "plotsink.service"
+update_service_file "./plotting" "plot_over.service"
 systemctl daemon-reload
 echo -e
 
