@@ -9,11 +9,19 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Array of full paths for old program files that have been renamed or are no longer needed
-obsolete_program_names=(
-    "/usr/local/bin/plot_avg"
-    # Add the full path for more old program files as needed
+# Define file migrations
+declare -A files_to_migrate=(
+    ["/usr/local/bin/plot_avg"]="/usr/local/bin/plot_timer"
+    #["/path/to/old_file2"]=""
 )
+
+# Define service migrations
+declare -A services_to_migrate=(
+    ["plot-starter.service"]="plot_starter.service"
+    #["old_service2.service"]=""
+)
+
+
 
 # Check for root privileges
 check_root() {
@@ -45,19 +53,72 @@ print_header() {
   fi
 }
 
-# Remove old program files
-remove_obsolete_program_names() {
-echo -e "\n${YELLOW}Checking for migration candidates...${NC}"
+migrate_files() {
+    local array_name=$1
+    declare -n file_pairs=$array_name
+    local migration_found=false
 
-    for file_renamed in "${obsolete_program_names[@]}"; do
-        if [[ -e $file_renamed ]]; then
-            echo -e "${YELLOW}Migrating $file_renamed..${NC}"
-            rm "$file_renamed"
-        else
-            echo -e "${GREEN}No migration required.${NC}"
+    #echo "Checking for migration candidates of files..."
+
+    for old_file in "${!file_pairs[@]}"; do
+        new_file=${file_pairs[$old_file]}
+
+        if [ -f "$old_file" ]; then
+            migration_found=true
+            if [ -n "$new_file" ]; then
+                mv "$old_file" "$new_file"
+                echo "Renamed $old_file to $new_file"
+            else
+                rm "$old_file"
+                echo "Removed $old_file"
+            fi
         fi
     done
+
+    if [ "$migration_found" = false ]; then
+        echo "No migration required for files."
+    fi
 }
+
+
+
+migrate_service_files() {
+    local array_name=$1
+    declare -n service_pairs=$array_name
+    local migration_found=false
+
+    #echo "Checking for migration candidates of services..."
+
+    for old_service in "${!service_pairs[@]}"; do
+        new_service=${service_pairs[$old_service]}
+
+        if [ -f "/etc/systemd/system/$old_service" ]; then
+            migration_found=true
+            if systemctl is-enabled --quiet "$old_service"; then
+                systemctl disable "$old_service"
+            fi
+
+            if [ -n "$new_service" ]; then
+                mv "/etc/systemd/system/$old_service" "/etc/systemd/system/$new_service"
+                echo "Renamed $old_service to $new_service"
+            else
+                rm "/etc/systemd/system/$old_service"
+                echo "Removed $old_service"
+            fi
+        fi
+    done
+
+    if [ "$migration_found" = true ]; then
+        systemctl daemon-reload
+        echo "Systemd daemon reloaded"
+    else
+        echo "No migration required for services."
+    fi
+}
+
+
+
+
 
 # Dependencies
 install_dependencies() {
@@ -232,11 +293,12 @@ prompt_service_action() {
 }
 
 
-# Clear the terminal
 clear
 check_root
 print_header
-remove_obsolete_program_names
+echo -e ${YELLOW}"Checking for migration candidates.."${NC}
+migrate_files "files_to_migrate"
+migrate_service_files "services_to_migrate"
 install_dependencies
 
 install_mergerfs
@@ -250,7 +312,7 @@ copy_files
 
 echo -e "\n${YELLOW}Updating systemd services...${NC}"
 update_service_file "./gardenmount" "garden-mount.service"
-update_service_file "./plotting" "plot-starter.service"
+update_service_file "./plotting" "plot_starter.service"
 update_service_file "./plotting" "plotsink.service"
 update_service_file "./plotting" "plot_over.service"
 systemctl daemon-reload
