@@ -13,6 +13,8 @@ logfile="/var/log/plot_over.log" # set to a valid path or leave empty to disable
 display_search_paths="false" # set to true to display the paths that are searched for plot files
 label="CHIA" # Default parameter for your label. Can also be set in commandline.
 subdir="" # Default parameter for your first subdirectory for plots in Disk. Can also be set in commandline.
+dry_run=true # set to true to run the script without actually deleting any plot files
+config_file="/etc/chiagarden/plot_over.config"
 ###### No variables to change below ###############
 
 # Add color variables and bold
@@ -29,6 +31,7 @@ IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
 
 # Configuration file name
 config_file="plot_over.config"
+config_paths=("/etc/chiagarden/$config_file" "$HOME/.config/chiagarden/$config_file" "./$config_file")
 
 # Function to load configuration from file
 load_config() {
@@ -41,20 +44,29 @@ load_config() {
     done < "$1"
 }
 
+# Print usage
+function print_usage() {
+    echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label] [--subdir subdir] [--config config_file_path] [--help]"
+    echo "Note: --mount-dir and --label cannot be used at the same time."
+}
 
-# Check and Load Configuration File
-CONFIG_PATHS=("/etc/chiagarden/$config_file" "$HOME/.config/chiagarden/$config_file" "./$config_file")
 
-for path in "${CONFIG_PATHS[@]}"; do
-    if [[ -f "$path" ]]; then
-        echo "Loading configuration from $path"
-        load_config "$path"
-        break
-    fi
-done
+# Print help text
+function print_help() {
+    echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label] [--subdir subdir] [--config config_file_path] [--help]"
+    echo ""
+    echo "Arguments:"
+    echo "  --dry-run          Run the script without actually deleting any plot files."
+    echo "  --interval         Set the interval in seconds between consecutive scans for plot files to remove."
+    echo "  --mount-dir        Set the base directory where your plot drives are mounted (e.g., /mnt/plots/)."
+    echo "  --label            Use this flag if you want the script to search for drives with a specific label pattern."
+    echo "  --subdir           Set the subdirectory within the drives where plot files are located."
+    echo "  --config           Specify a custom configuration file path (including filename)."
+    echo "  --help             Display this help message and exit."
+    echo ""
+    echo "Note: --mount-dir and --label cannot be used at the same time."
+}
 
-# Parse command-line arguments
-dry_run=false
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -75,6 +87,10 @@ while [[ "$#" -gt 0 ]]; do
             subdir="$2"
             shift 2
             ;;
+        --config)
+            custom_config_path="$2"
+            shift 2
+            ;;
         --help)
             print_help
             exit 0
@@ -87,27 +103,30 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-# Print help text
-function print_help() {
-    echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label] [--subdir subdir] [--help]"
-    echo ""
-    echo "Arguments:"
-    echo "  --dry-run          Run the script without actually deleting any plot files."
-    echo "  --interval         Set the interval in seconds between consecutive scans for plot files to remove."
-    echo "  --mount-dir        Set the base directory where your plot drives are mounted (e.g., /mnt/plots/)."
-    echo "  --label            Use this flag if you want the script to search for drives with a specific label pattern."
-    echo "  --subdir           Set the subdirectory within the drives where plot files are located."
-    echo "  --help             Display this help message and exit."
-    echo ""
-    echo "Note: --mount-dir and --label cannot be used at the same time."
-}
 
+# Check if a custom config file is specified
+if [[ -n "$custom_config_path" ]]; then
+    if [[ -f "$custom_config_path" ]]; then
+        echo "Loading configuration from custom path: $custom_config_path"
+        load_config "$custom_config_path"
+    else
+        echo "Error: Configuration file specified at '$custom_config_path' not found."
+        exit 1
+    fi
+else
+    echo "No custom configuration file specified. Using script's internal default values."
+fi
 
-# Print usage
-function print_usage() {
-    echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label]"
-    echo "Note: --mount-dir and --label cannot be used at the same time."
-}
+# config_loaded=false
+# for path in "${config_paths[@]}"; do
+#     if [[ -f "$path" ]]; then
+#         echo "Loading configuration from $path"
+#         load_config "$path"
+#         config_loaded=true
+#         break
+#     fi
+# done
+
 
 # is_running_as_systemd_service() {
 #     if [ -n "$INVOCATION_ID" ]; then
@@ -366,6 +385,7 @@ function display_free_disks_info() {
 
 
 validate_arguments
+#check_and_load_config
 find_disks
 while true; do
   if ! is_running_as_systemd_service; then

@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/plot_over
+ExecStart=/usr/local/bin/plot_over --config /etc/chiagarden/plot_over.config
 #ExecStart=/usr/local/bin/plot_over
 
 Restart=on-failure
