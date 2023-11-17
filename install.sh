@@ -188,7 +188,8 @@ copy_files() {
     files_to_copy=(
       "./chiainit/chiainit"
       "./gardenmount/gardenmount"
-      "./cropgains/cropgains"
+      "./farming/cropgains"
+      "./farming/analyze_lookup"
       "./plotting/plot_counter"
       "./plotting/plot_mover"
       "./plotting/plot_over"
