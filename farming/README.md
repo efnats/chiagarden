@@ -49,5 +49,11 @@ Finally, make sure to set correct timezones in yor tasmota device. Specifically,
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
+# analyze_lookup - check your lookup times
+
+This ia quick and dirty script written to show average lookup times to find out the impact of mergerfs on lookup times. As it looks so far there is absolutely no impact ;)
+
+
+
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
