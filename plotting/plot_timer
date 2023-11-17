@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Chiagarden plot_timer
-# This script will parse the plot-starter logs and calculate the average time for each phase and total time for the last n minutes.
+# This script will parse the plot_starter logs and calculate the average time for each phase and total time for the last n minutes.
 
 
 interval=80 # Default interval is 60 seconds
@@ -71,7 +71,7 @@ parse_args() {
 # Function to extract total plot time and phase times
 extract_log_data() {
     local last_minutes=$1
-    journalctl --since "$last_minutes minutes ago" -u plot-starter | grep -E "Compression Level:|Total plot creation time was|Phase [1-4] took|finished, took [0-9.]+ sec, [0-9.]+ MB/s"
+    journalctl --since "$last_minutes minutes ago" -u plot_starter | grep -E "Compression Level:|Total plot creation time was|Phase [1-4] took|finished, took [0-9.]+ sec, [0-9.]+ MB/s"
 }
 
 # Function to process log data
