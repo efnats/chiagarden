@@ -18,7 +18,7 @@ declare -A files_to_migrate=(
 # Define service migrations
 declare -A services_to_migrate=(
     ["plot-starter.service"]="plot_starter.service"
-    #["old_service2.service"]=""
+    ["garden-mount.service"]="gardenmount.service"
 )
 
 
@@ -302,7 +302,7 @@ migrate_service_files "services_to_migrate"
 install_dependencies
 
 install_mergerfs
-echo -e "${YELLOW}Downloading madMAx's binaries required for plot-starter https://github.com/madMAx43v3r...${NC}"
+echo -e "${YELLOW}Downloading madMAx's binaries required for plot_starter https://github.com/madMAx43v3r...${NC}"
 download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/cuda-plotter/linux/x86_64/cuda_plot_k32" "cuda_plot_k32"
 download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_copy" "chia_plot_copy"
 download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_sink" "chia_plot_sink"
@@ -311,21 +311,17 @@ create_drectories
 copy_files
 
 echo -e "\n${YELLOW}Updating systemd services...${NC}"
-update_service_file "./gardenmount" "garden-mount.service"
+update_service_file "./gardenmount" "gardenmount.service"
 update_service_file "./plotting" "plot_starter.service"
 update_service_file "./plotting" "plotsink.service"
 update_service_file "./plotting" "plot_over.service"
 systemctl daemon-reload
 echo -e
 
-prompt_service_action "garden-mount.service" "Automount drives during boot"
-prompt_service_action "plot-starter.service" "Start plotting upon boot"
+prompt_service_action "gardenmount.service" "Automount drives during boot"
+prompt_service_action "plot_starter.service" "Start plotting upon boot"
 prompt_service_action "plotsink.service" "Start MadMax's Plotsink on port 1337 during boot"
-
-
-#enable_service "garden-mount.service" "garden-mount service (Automount drives during boot)" "Y"
-#enable_service "plot-starter.service" "plot-starter service (Start plotting upon boot)" "N"
-#enable_service "plotsink.service" "plotsink service (Start MadMax's Plotsink on port 1337 during boot)" "Y"
+prompt_service_action "plot_over.service" "Start plot_over on boot"
 
 echo -e "${BOLD}${GREEN}ChiaGarden installation complete!${NC}"
 echo -e "Please read the README.md files for more information on how to use ChiaGarden.\n"
