@@ -459,6 +459,24 @@ for i in "${!DRIVES[@]}"; do
     fi
 done
 
+# Temporary array for non-excluded drives
+NON_EXCLUDED_DRIVES=()
+
+# Filter out the system drive, mounted drives, and user-excluded drives
+for drive in "${DRIVES[@]}"; do
+    if is_system_drive "$drive" || is_drive_mounted "$drive" || [[ " ${EXCLUDED_DRIVES[*]} " == *"$drive"* ]]; then
+        # Drive is excluded, do nothing
+        :
+    else
+        # Add non-excluded drives to the temporary array
+        NON_EXCLUDED_DRIVES+=("$drive")
+    fi
+done
+
+# Update DRIVES to only include non-excluded drives
+DRIVES=("${NON_EXCLUDED_DRIVES[@]}")
+
+
 check_fstype_issued
 check_drives_exist
 summarize_actions
@@ -471,11 +489,15 @@ if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "-
 fi
 
 
-# Iterate through the provided arguments and execute action
 for drive in "${DRIVES[@]}"; do
-    echo "Processing drives: ${DRIVES[*]}" >&2
+    # Skip if the drive is in the excluded list
+    if [[ " ${EXCLUDED_LIST[*]} " == *" $drive "* ]]; then
+        echo "Skipping operations on excluded drive: $drive"
+        continue
+    fi
     execute_action "$ACTION" $drive
 done
+
 
 
 echo -e "\nOperation complete for all specified drives.\n"
