@@ -230,7 +230,7 @@ plots_distribution() {
 
         plot="C$i"
         size="${sizes[$i]:-0}"
-        effective_size=$(echo "$count * 0.99023438" | bc)
+        effective_size=$(echo "$count * 0.099023438" | bc)
         printf "%-5s %12s %12s %12s\n" "$plot:" "$count" "$(printf '%.2f' "$size")" "$(printf '%.2f' "$effective_size")"
         total_plots=$((total_plots + count))
         total_size=$(awk -v total_size="$total_size" -v new_size="$size" 'BEGIN {print total_size+new_size}')

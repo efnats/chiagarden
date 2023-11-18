@@ -1,15 +1,13 @@
 [Unit]
 Description=PlotSink Service
-After=garden-mount.service
-Wants=garden-mount.service
+After=gardenmount.service
+Wants=gardenmount.service
 
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/plotsink.sh
 Restart=always
 RestartSec=10
-StandardOutput=file:/var/log/plotsink.log
-StandardError=file:/var/log/plotsink.log
 
 [Install]
 WantedBy=multi-user.target
