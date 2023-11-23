@@ -6,7 +6,7 @@
 
 min_free_space="100" # minimum free space in GB
 amount_free_disks="10" # desired amount of disks with min_free_space
-replot_levels="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,18,19,20" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
+replot_levels="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,19,20" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
 search_depth="10" # maximum search depth for plot files - how many subdir levels should we iterate?
 interval="30" # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
 logfile="/var/log/plot_over.log" # set to a valid path or leave empty to disable logging
@@ -14,7 +14,6 @@ display_search_paths="false" # set to true to display the paths that are searche
 label="CHIA" # Default parameter for your label. Can also be set in commandline.
 subdir="" # Default parameter for your first subdirectory for plots in Disk. Can also be set in commandline.
 dry_run=true # set to true to run the script without actually deleting any plot files
-config_file="/etc/chiagarden/plot_over.config"
 ###### No variables to change below ###############
 
 # Add color variables and bold
@@ -29,15 +28,11 @@ plot_patterns=('plot-k32-202*.plot' 'SPECIAL_PATTERN_1' 'SPECIAL_PATTERN_2' 'SPE
 min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
 IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
 
-# Configuration file name
-config_file="plot_over.config"
-config_paths=("/etc/chiagarden/$config_file" "$HOME/.config/chiagarden/$config_file" "./$config_file")
 
 # Function to load configuration from file
 load_config() {
     while IFS='=' read -r key value; do
         if [[ "$key" != "" && "$key" != \#* ]]; then
-            # Remove inline comments and trim whitespace
             value=$(echo "$value" | cut -d'#' -f1 | xargs)
             eval "$key='$value'"
         fi
@@ -116,16 +111,6 @@ if [[ -n "$custom_config_path" ]]; then
 else
     echo "No custom configuration file specified. Using script's internal default values."
 fi
-
-# config_loaded=false
-# for path in "${config_paths[@]}"; do
-#     if [[ -f "$path" ]]; then
-#         echo "Loading configuration from $path"
-#         load_config "$path"
-#         config_loaded=true
-#         break
-#     fi
-# done
 
 
 # is_running_as_systemd_service() {
