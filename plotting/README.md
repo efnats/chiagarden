@@ -5,7 +5,7 @@
 ## Usage
 
 ```bash
-./chia_plot_counter (--mount-dir </path/to/dir> | --label <disklabel>) [--interval interval_seconds]
+./plot_counter (--mount-dir </path/to/dir> | --label <disklabel>) [--interval interval_seconds]
 ```
 
 ## Options
@@ -18,20 +18,20 @@
 count all plots in /media/root/* Rescan after 100 seconds.
 
 ```bash
-./chia_plot_counter --mount-dir /media/root --interval 100
+./plot_counter --mount-dir /media/root --interval 100
 ```
 
 
 count all plots from all disks in /media/root/ beginning with the pattern CHIA* (/media/root/CHIA-001 /media/root/CHIA-002 ...)
 
 ```bash
-./chia_plot_counter /media/root/CHIA
+./plot_counter /media/root/CHIA
 ```   
 
 count all plots from all disks labelled beginning with the pattern GIGA (no matter where they are mounted at in the system).
 
 ```bash
-./chia_plot_counter --label GIGA
+./plot_counter --label GIGA
 ```   
 
 
