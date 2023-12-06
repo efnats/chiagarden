@@ -65,6 +65,13 @@ get_fs_type() {
     echo "$fs_type"
 }
 
+# Function to get the size of a drive
+get_drive_size() {
+    drive=$1
+    size=$(lsblk -dn -o SIZE /dev/$drive | tr -d '[:space:]')
+    echo "$size"
+}
+
 
 # Confirm destructive actions
 confirm_destructive_action() {
@@ -300,7 +307,7 @@ is_drive_mounted() {
 
 
 # Check if fstype is issued for format or label action
-function check_fstype_issued() {
+check_fstype_issued() {
 if { [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; } && [ -z "$FSTYPE" ]; then
     echo "Error: Missing filesystem type for format or label action."
     display_usage
@@ -389,10 +396,11 @@ execute_action() {
     drive=$2
     local output
     local exit_status
+    local drive_size=$(get_drive_size $drive)
 
     case "$action" in
         --init)
-            echo -e "\n${BOLD}${CYAN}[+] Drive /dev/$drive${RESET}"
+            echo -e "\n${BOLD}${CYAN}[+] Drive /dev/$drive [$drive_size]${RESET}"
             init $drive
             ;;
         --wipe)
