@@ -549,10 +549,10 @@ summarize_actions
 
 
 # Check for and confirm destructive actions
-# if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; then
-#    confirm_destructive_action "${DRIVES[@]}"
-#    #echo ""
-# fi
+ if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; then
+    confirm_destructive_action "${DRIVES[@]}"
+    #echo ""
+ fi
 
 
 for drive in "${DRIVES[@]}"; do
