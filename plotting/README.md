@@ -89,30 +89,13 @@ This command will monitor the `/mnt/plotting` directory for new plot files and m
    - `chmod +x plot_over`
    - `./plot_over`
 
-## Options
-
-   - `--dry-run`(optional): simulation mode. Will not delete anything
-   - `--mount-dir </path/to/dir>`: Process Plots under the specified directory
-   - `--label <disklabel>`: Process plots in the disks starting with the specified label pattern
-   - `--subdir <subdir>`: Process Plots in `</path/to/disk>/<subdir>`
 
 ## Examples
    
-   Delete enough Plots in disks mounted in /media/root/ to make sure that x amount of disks each have y G free space (set x/y values in the variables section in the script)
+   Call plot_over and load its config file from /etc/chiagarden/plot_over.config
    ```bash
-   ./plot_over --mount-dir /media/root
+   ./plot_over --config /etc/chiagarden/plot_over.config
    ```
-
-   Delete enough Plots in disks labelled with the pattern CHIA to make sure that x amount of disks each have y G free space. Process only Plots in /path/to/DISK/gigahorse. (set x/y values in the variables section in the script)
-   ```bash
-   ./plot_over --label CHIA --subdir gigahorse
-   ```
-
-   Same as above, but do not actually delete anything. Just show what would happen.
-   ```bash
-   ./plot_over --dry-run --label CHIA --subdir gigahorse
-   ```
-
 
 
 

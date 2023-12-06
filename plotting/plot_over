@@ -3,17 +3,10 @@
 ################################################
 #   VARIABLES - adjust these to your liking    #
 ################################################
-
-min_free_space="100" # minimum free space in GB
-amount_free_disks="10" # desired amount of disks with min_free_space
-replot_levels="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,19,20" # comma-separated list of Plot Compressions levels that you would like to replot. Those will be (gradually) removed.
-search_depth="10" # maximum search depth for plot files - how many subdir levels should we iterate?
-interval="30" # rescan every xx seconds. this is AFTER removal of plot files in one iteration is finished. it is okay to set this relatively low (30s)
-logfile="/var/log/plot_over.log" # set to a valid path or leave empty to disable logging
-display_search_paths="false" # set to true to display the paths that are searched for plot files
-label="CHIA" # Default parameter for your label. Can also be set in commandline.
-subdir="" # Default parameter for your first subdirectory for plots in Disk. Can also be set in commandline.
-dry_run=true # set to true to run the script without actually deleting any plot files
+#
+# the variable section has moved out to the config file entirely
+# please see the example config file for details
+#
 ###### No variables to change below ###############
 
 # Add color variables and bold
@@ -24,30 +17,19 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
-plot_patterns=('plot-k32-202*.plot' 'SPECIAL_PATTERN_1' 'SPECIAL_PATTERN_2' 'SPECIAL_PATTERN_3' 'SPECIAL_PATTERN_4' 'SPECIAL_PATTERN_5' 'SPECIAL_PATTERN_6' 'SPECIAL_PATTERN_7' 'SPECIAL_PATTERN_8' 'SPECIAL_PATTERN_9' 'plot-k32-c10-*.plot' 'plot-k32-c11-*.plot' 'plot-k32-c12-*.plot' 'plot-k32-c13-*.plot' 'plot-k32-c14-*.plot' 'plot-k32-c15-*.plot' 'plot-k32-c16-*.plot' 'plot-k32-c17-*.plot' 'plot-k32-c18-*.plot' 'plot-k32-c19-*.plot' 'plot-k32-c20-*.plot')
-min_free_space_bytes=$((min_free_space * 1000000000)) # minimum free space in bytes
-IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
+# Initialize variable for configuration file path
+config_file_path="./plot_over.config"
 
-
-# Function to load configuration from file
-load_config() {
-    while IFS='=' read -r key value; do
-        if [[ "$key" != "" && "$key" != \#* ]]; then
-            value=$(echo "$value" | cut -d'#' -f1 | xargs)
-            eval "$key='$value'"
-        fi
-    done < "$1"
-}
 
 # Print usage
-function print_usage() {
+print_usage() {
     echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label] [--subdir subdir] [--config config_file_path] [--help]"
     echo "Note: --mount-dir and --label cannot be used at the same time."
 }
 
 
 # Print help text
-function print_help() {
+print_help() {
     echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label] [--subdir subdir] [--config config_file_path] [--help]"
     echo ""
     echo "Arguments:"
@@ -65,25 +47,12 @@ function print_help() {
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --dry-run) dry_run=true; shift ;;
-        --interval)
-            interval="$2"
-            shift 2
-            ;;
-        --mount-dir)
-            mount_dir="$2"
-            shift 2
-            ;;
-        --label)
-            label="$2"
-            shift 2
-            ;;
-        --subdir)
-            subdir="$2"
-            shift 2
+        --dry-run)
+            dry_run=true
+            shift
             ;;
         --config)
-            custom_config_path="$2"
+            config_file_path="$2"
             shift 2
             ;;
         --help)
@@ -99,18 +68,35 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 
-# Check if a custom config file is specified
-if [[ -n "$custom_config_path" ]]; then
-    if [[ -f "$custom_config_path" ]]; then
-        echo "Loading configuration from custom path: $custom_config_path"
-        load_config "$custom_config_path"
+# Function to load configuration from file
+load_config() {
+    while IFS='=' read -r key value; do
+        if [[ "$key" != "" && "$key" != \#* ]]; then
+            value=$(echo "$value" | cut -d'#' -f1 | xargs)
+            eval "$key='$value'"
+        fi
+    done < "$1"
+}
+
+# Check if a custom config file is specified and load it
+if [[ -n "$config_file_path" ]]; then
+    if [[ -f "$config_file_path" ]]; then
+        echo "Loading configuration from file: $config_file_path"
+        load_config "$config_file_path"
+        sleep 1
     else
-        echo "Error: Configuration file specified at '$custom_config_path' not found."
+        echo "Error: Configuration file specified at '$config_file_path' not found."
         exit 1
     fi
 else
-    echo "No custom configuration file specified. Using script's internal default values."
+    echo "Error: No configuration file specified."
+    exit 1
 fi
+
+plot_patterns=('plot-k32-202*.plot' 'SPECIAL_PATTERN_1' 'SPECIAL_PATTERN_2' 'SPECIAL_PATTERN_3' 'SPECIAL_PATTERN_4' 'SPECIAL_PATTERN_5' 'SPECIAL_PATTERN_6' 'SPECIAL_PATTERN_7' 'SPECIAL_PATTERN_8' 'SPECIAL_PATTERN_9' 'plot-k32-c10-*.plot' 'plot-k32-c11-*.plot' 'plot-k32-c12-*.plot' 'plot-k32-c13-*.plot' 'plot-k32-c14-*.plot' 'plot-k32-c15-*.plot' 'plot-k32-c16-*.plot' 'plot-k32-c17-*.plot' 'plot-k32-c18-*.plot' 'plot-k32-c19-*.plot' 'plot-k32-c20-*.plot')
+min_free_space_bytes=$((min_free_space * 1073741824)) # minimum free space in bytes
+IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
+
 
 
 # is_running_as_systemd_service() {
@@ -146,7 +132,7 @@ sleep_interval() {
 }
 
 # Check if duf is installed
-function check_duf_installed() {
+check_duf_installed() {
   if ! command -v duf >/dev/null 2>&1; then
     echo ""
     echo -e "${YELLOW}${BOLD}Duf-utility not found${RESET}"
@@ -157,7 +143,7 @@ function check_duf_installed() {
 }
 
 # Validate the command-line arguments
-function validate_arguments() {
+validate_arguments() {
   if [ -z "$mount_dir" ] && [ -z "$label" ]; then
     print_usage
     exit 1
@@ -171,7 +157,7 @@ function validate_arguments() {
 }
 
 # Find disks based on input parameters
-function find_disks() {
+find_disks() {
   # If --label is provided, find the mount points matching the label
   if [ -n "$label" ]; then
     IFS=$'\n' read -rd '' -a disks < <(lsblk -o NAME,LABEL,MOUNTPOINT | awk -v label="$label" '$2 ~ "^"label {print $3}')
@@ -189,7 +175,7 @@ function find_disks() {
 }
 
 ## Detailed info about paths to include for searching plot files
-function search_path_output() {
+search_path_output() {
     echo ""
     #echo -e "${YELLOW}Debugging output:${RESET}"
      echo "Processing the following directories:"
@@ -201,7 +187,7 @@ function search_path_output() {
 }
 
 
-function get_free_disks() {
+get_free_disks() {
   free_disks=()
   eligible_disks=()   # Add this array to keep track of disks eligible for plot removal
 
@@ -222,7 +208,7 @@ function get_free_disks() {
 }
 
 
-function find_oldest_plot() {
+find_oldest_plot() {
   local level=$1
   oldest_file=""
   oldest_timestamp=$(date +%s)
@@ -256,7 +242,7 @@ function find_oldest_plot() {
 
 
 # Remove identified plot and log action into logfile
-function remove_oldest_plot() {
+remove_oldest_plot() {
     if [ -n "$oldest_file" ]; then
         # Determine if running as systemd service
         if is_running_as_systemd_service; then
@@ -287,7 +273,7 @@ function remove_oldest_plot() {
 
 
 # Find and remove the oldest plot file based on the provided compression level or skip in certain conditions
-function process_plot_files() {
+process_plot_files() {
   # Determine if running as systemd service
   if is_running_as_systemd_service; then
       date_prefix=""
@@ -330,7 +316,7 @@ function process_plot_files() {
 }
 
 # Display information about the script's settings and monitored disks
-function display_info() {
+display_info() {
   disk_count="${#disks[@]}"
 
   if [ -n "$mount_dir" ]; then
@@ -353,7 +339,7 @@ function display_info() {
 }
 
 # Display information about free disks
-function display_free_disks_info() {
+display_free_disks_info() {
   get_free_disks
   if [ ${#free_disks[@]} -gt 0 ]; then
     echo -e "${CYAN}${#free_disks[@]}${RESET} drives meet the requirements"
