@@ -24,17 +24,13 @@ As long as your disks are mounted to the same mount point consistently, there's 
 
 [plotting](https://github.com/efnats/chiagarden/tree/main/plotting) contains various scripts for managing, monitoring and automating the (re)plotting process.
 
+## farming
+
+[farming](https://github.com/efnats/chiagarden/tree/main/farming) contains various scripts for analyzing farming performance, specifically for chia.
+
 ## taco_list
 
 [taco_list](https://github.com/efnats/chiagarden/tree/main/taco_list) is a simple wrapper script to list your destination disks and execute any command with the given parameters - for example chia_plot_sink
-
-## cropgains
-
-[cropgains](https://github.com/efnats/chiagarden/tree/main/cropgains) is a profitability monitoring tool for your Chia farming operation providing infos about revenue, cost and profit. It supports automatically extracting energy consumption info from tasmota devices.
-
-## machinaris
-
-[machinaris](https://github.com/efnats/chiagarden/tree/main/machinaris) this folder contains script(s) that help with the setup and installation of [Machinaris](https://www.machinaris.app/), specifically with the docker-compose setup. This part is currently mostly work in progress
 
 ## Getting Started
 

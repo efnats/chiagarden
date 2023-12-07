@@ -51,7 +51,7 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 
 # analyze_lookup - check your lookup times
 
-This ia quick and dirty script written to show average lookup times to find out the impact of mergerfs on lookup times. As it looks so far there is absolutely no impact ;)
+This ia quick and dirty script written to show average lookup times. I wrote this to find out the impact of mergerfs on lookup times. I turns out, there is absolutely none. Make sure to run the installer script, as it is going to pull and install the latest version of mergerfs. The package maintainers version on debian and ubuntu are outdated.  ;)
 
 
 
