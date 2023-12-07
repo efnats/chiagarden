@@ -301,7 +301,7 @@ check_drives_exist() {
 # Function to check if any of the specified drives are mounted
 is_drive_mounted() {
     drive=$1
-    grep -qs "/dev/${drive}[0-9]*" /proc/mounts
+    grep -qs "/dev/${drive}[0-9]* " /proc/mounts
     return $?
 }
 
