@@ -124,7 +124,7 @@ migrate_service_files() {
 install_dependencies() {
 echo -e "\n${YELLOW}Updating package list and installing dependencies...${NC}"
 apt update
-apt install -y curl lsb-release xfsprogs ntfs-3g smartmontools parted python3 python3-pip
+apt install -y curl lsb-release xfsprogs ntfs-3g smartmontools parted bc python3 python3-pip
 pip3 install colorama
 pip3 install requests
 }
