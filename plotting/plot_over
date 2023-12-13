@@ -33,7 +33,7 @@ print_help() {
     echo "Usage: $0 [--dry-run] [--interval interval] [--mount-dir mount_dir] [--label label] [--subdir subdir] [--config config_file_path] [--help]"
     echo ""
     echo "Arguments:"
-    echo "  --dry-run          Run the script without actually deleting any plot files."
+    #echo "  --dry-run          Run the script without actually deleting any plot files."
     echo "  --interval         Set the interval in seconds between consecutive scans for plot files to remove."
     echo "  --mount-dir        Set the base directory where your plot drives are mounted (e.g., /mnt/plots/)."
     echo "  --label            Use this flag if you want the script to search for drives with a specific label pattern."
@@ -47,10 +47,10 @@ print_help() {
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --dry-run)
-            dry_run=true
-            shift
-            ;;
+        # --dry-run)
+        #     dry_run=true
+        #     shift
+        #     ;;
         --config)
             config_file_path="$2"
             shift 2
@@ -96,6 +96,7 @@ fi
 plot_patterns=('plot-k32-202*.plot' 'SPECIAL_PATTERN_1' 'SPECIAL_PATTERN_2' 'SPECIAL_PATTERN_3' 'SPECIAL_PATTERN_4' 'SPECIAL_PATTERN_5' 'SPECIAL_PATTERN_6' 'SPECIAL_PATTERN_7' 'SPECIAL_PATTERN_8' 'SPECIAL_PATTERN_9' 'plot-k32-c10-*.plot' 'plot-k32-c11-*.plot' 'plot-k32-c12-*.plot' 'plot-k32-c13-*.plot' 'plot-k32-c14-*.plot' 'plot-k32-c15-*.plot' 'plot-k32-c16-*.plot' 'plot-k32-c17-*.plot' 'plot-k32-c18-*.plot' 'plot-k32-c19-*.plot' 'plot-k32-c20-*.plot')
 min_free_space_bytes=$((min_free_space * 1073741824)) # minimum free space in bytes
 IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
+disks_replotted=0
 
 
 
@@ -123,6 +124,8 @@ is_running_as_systemd_service() {
     # fi
 # }
 
+is_running_as_systemd_service
+running_as_systemd_service=$?
 
 # Function to sleep for the specified interval before repeating the loop
 sleep_interval() {
@@ -156,14 +159,28 @@ validate_arguments() {
   fi
 }
 
+
+# Function to get formatted date
+get_formatted_date() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S')"
+}
+
+
 # Find disks based on input parameters
 find_disks() {
-  # If --label is provided, find the mount points matching the label
   if [ -n "$label" ]; then
+    # If --label is provided, find the mount points matching the label
     IFS=$'\n' read -rd '' -a disks < <(lsblk -o NAME,LABEL,MOUNTPOINT | awk -v label="$label" '$2 ~ "^"label {print $3}')
   else
-    # If --mount-dir is provided, use it as the base directory for directories with the pattern "CHIA-*"
-    disks=("$mount_dir"*)
+    # If --mount-dir is provided, find all actual mounted disks in the specified directory
+    if [ -d "$mount_dir" ]; then
+      # List all mount points and filter those under mount_dir
+      IFS=$'\n' read -rd '' -a disks < <(mount | awk -v mount_dir="$mount_dir" '$3 ~ "^"mount_dir {print $3}')
+    else
+      echo "Mount directory $mount_dir not found."
+      disks=()  # Clear the disks array to prevent unintended operations
+      return 1  # Optional: Return an error code to indicate failure
+    fi
   fi
 
   # Append subdir to each disk if provided
@@ -174,7 +191,32 @@ find_disks() {
   fi
 }
 
-## Detailed info about paths to include for searching plot files
+
+# Identify replotted disks
+get_replotted_disks() {
+    replotted_disks_array=()  # Array to store the names of replotted disks
+    disks_replotted=0  # Counter for the number of replotted disks
+
+    for disk in "${disks[@]}"; do
+        contains_unwanted_plots=false
+        for level in "${replot_levels_arr[@]}"; do
+            # Check if disk contains plots of this compression level
+            plot_pattern="plot-k32-c${level}-*.plot"
+            if find "$disk" -maxdepth "$search_depth" -type f -name "$plot_pattern" -exec false {} +; then
+                contains_unwanted_plots=true
+                break
+            fi
+        done
+
+        if [ "$contains_unwanted_plots" = false ]; then
+            replotted_disks_array+=("$disk")  # Add disk to replotted_disks_array
+            ((disks_replotted++))  # Increment the counter
+        fi
+    done
+}
+
+
+# Detailed info about paths to include for searching plot files
 search_path_output() {
     echo ""
     #echo -e "${YELLOW}Debugging output:${RESET}"
@@ -189,14 +231,18 @@ search_path_output() {
 
 get_free_disks() {
   free_disks=()
-  eligible_disks=()   # Add this array to keep track of disks eligible for plot removal
+  eligible_disks=()
 
   for disk in "${disks[@]}"; do
     free_space=$(df -B 1 "$disk" | awk 'NR==2 {print $4}')
-    if [ "$free_space" -ge "$min_free_space_bytes" ]; then
-      free_disks+=("$disk")
-    else
-      eligible_disks+=("$disk")   # Populate this list with disks that don't meet the minimum free space requirement
+
+    # Check if the disk is not in the replotted_disks_array
+    if [[ ! " ${replotted_disks_array[@]} " =~ " ${disk} " ]]; then
+        if [ "$free_space" -ge "$min_free_space_bytes" ]; then
+            free_disks+=("$disk")
+        else
+            eligible_disks+=("$disk")   # Only add to eligible if not fully replotted
+        fi
     fi
   done
 
@@ -210,11 +256,11 @@ get_free_disks() {
 
 find_oldest_plot() {
   local level=$1
-  oldest_file=""
+  oldest_plot=""
   oldest_timestamp=$(date +%s)
   file_count=0
 
-  # Change the loop to iterate over eligible_disks instead of all disks
+  # Iterate over eligible_disks and find the oldest plot file
   for disk in "${eligible_disks[@]}"; do
     if [[ "$level" -ge 1 && "$level" -le 9 ]]; then
       single_digit=$(($level))
@@ -231,7 +277,7 @@ find_oldest_plot() {
 
         if [ "$(echo "$timestamp < $oldest_timestamp" | bc)" -eq 1 ]; then
           oldest_timestamp=$timestamp
-          oldest_file=$file
+          oldest_plot=$file
         fi
         file_count=$((file_count + 1))
       done <<< "$find_output"
@@ -243,25 +289,25 @@ find_oldest_plot() {
 
 # Remove identified plot and log action into logfile
 remove_oldest_plot() {
-    if [ -n "$oldest_file" ]; then
-        # Determine if running as systemd service
-        if is_running_as_systemd_service; then
+    if [ -n "$oldest_plot" ]; then
+        # Use the pre-determined service running status
+        if [ "$running_as_systemd_service" -eq 0 ]; then
             date_prefix=""
         else
-            date_prefix="${CYAN}$(date)${RESET} "
+            date_prefix="${CYAN}$(get_formatted_date)${RESET} "
         fi
 
         # Output message
         if [ "$dry_run" = true ]; then
-            echo -e "${date_prefix}DRY-RUN would remove $oldest_file"
+            echo -e "${date_prefix}DRY-RUN would remove $oldest_plot"
         else
-            echo -e "${date_prefix}removing $oldest_file"
-            rm_output=$(rm -v "$oldest_file" 2>&1)
+            echo -e "${date_prefix}removing $oldest_plot"
+            rm_output=$(rm -v "$oldest_plot" 2>&1)
             echo -e "${date_prefix}$rm_output"
         fi
 
         # Log to file only if not running as systemd service
-        if ! is_running_as_systemd_service && [ -n "$logfile" ]; then
+        if [ "$running_as_systemd_service" -ne 0 ] && [ -n "$logfile" ]; then
             echo "$(date) - ${rm_output}" >> "$logfile"
         fi
 
@@ -272,13 +318,14 @@ remove_oldest_plot() {
 
 
 
+
 # Find and remove the oldest plot file based on the provided compression level or skip in certain conditions
 process_plot_files() {
-  # Determine if running as systemd service
-  if is_running_as_systemd_service; then
+  # Use the pre-determined service running status
+  if [ "$running_as_systemd_service" -eq 0 ]; then
       date_prefix=""
   else
-      date_prefix="${CYAN}$(date)${RESET} "
+      date_prefix="${CYAN}$(get_formatted_date)${RESET} "
   fi
   get_free_disks
 
@@ -315,8 +362,9 @@ process_plot_files() {
   fi
 }
 
+
 # Display information about the script's settings and monitored disks
-display_info() {
+display_config_info() {
   disk_count="${#disks[@]}"
 
   if [ -n "$mount_dir" ]; then
@@ -326,10 +374,11 @@ display_info() {
   fi
 
   echo -e "${CYAN}$amount_free_disks${RESET} drives each required to have ${CYAN}$min_free_space${RESET} GB free space"
+  echo -e "${CYAN}$disks_replotted${RESET} drives are fully replotted"
   echo -e "Plot levels marked for removal: ${CYAN}$replot_levels${RESET}"
   echo -e
   if [ "$dry_run" = true ]; then
-    echo ""
+    #echo ""
     echo -e "${CYAN}DRY-RUN MODE - NOTHING WILL BE DELETED${RESET}"
     echo ""
   fi
@@ -345,7 +394,7 @@ display_free_disks_info() {
     echo -e "${CYAN}${#free_disks[@]}${RESET} drives meet the requirements"
     
     # Execute duf command only if not running as systemd service and duf is installed
-    if ! is_running_as_systemd_service && check_duf_installed; then
+    if [ "$running_as_systemd_service" -ne 0 ] && check_duf_installed; then
       duf ${free_disks[@]}
       echo ""
     fi
@@ -355,17 +404,32 @@ display_free_disks_info() {
 }
 
 
+
 validate_arguments
-#check_and_load_config
 find_disks
+
+# Count total disks
+disk_count="${#disks[@]}"
+
+# Identify replotted disks and adjust amount_free_disks
+get_replotted_disks
+max_free_disks=$((disk_count - disks_replotted))
+
+# Adjust amount_free_disks if necessary
+if [ "$amount_free_disks" -gt "$max_free_disks" ]; then
+    amount_free_disks=$max_free_disks
+fi
+
+# Main loop
 while true; do
-  if ! is_running_as_systemd_service; then
+  if [ "$running_as_systemd_service" -ne 0 ]; then
     clear
     echo -e ${BOLD}Chiagarden plot_over${RESET}
     echo
   fi
-  display_info
+  display_config_info
   display_free_disks_info
   process_plot_files
   sleep_interval
 done
+
