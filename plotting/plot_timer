@@ -141,12 +141,17 @@ for entry in $processed_plot_data; do
 done
 }
 
-# Function to sleep for the specified interval before repeating the loop
 sleep_interval() {
-    echo
-    echo -e "every ${CYAN}$interval${RESET} seconds"
-    sleep "$interval"
+    local countdown="$interval"
+    echo -e
+    while [ $countdown -gt 0 ]; do
+        echo -ne "Next update in ${CYAN}$countdown${RESET} seconds...\r"
+        sleep 1
+        ((countdown--))
+    done
+    echo -ne '\n'
 }
+
 
 # Function to display the results in specified format
 display_plotting_results() {
@@ -240,5 +245,6 @@ do
     display_header $total_count
     display_plotting_results "$processed_plot_data"
     display_transfer_results "$processed_transfer_data"
+    echo
     sleep_interval
 done

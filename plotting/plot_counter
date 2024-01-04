@@ -300,11 +300,15 @@ data_written() {
 }
 
 
-# Function to sleep for the specified interval before repeating the loop
 sleep_interval() {
-    echo
-    echo -e "every ${CYAN}$interval${RESET} seconds"
-    sleep "$interval"
+    local countdown="$interval"
+    echo -e
+    while [ $countdown -gt 0 ]; do
+        echo -ne "Next update in ${CYAN}$countdown${RESET} seconds...\r"
+        sleep 1
+        ((countdown--))
+    done
+    echo -ne '\n'
 }
 
 

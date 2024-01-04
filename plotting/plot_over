@@ -93,8 +93,7 @@ else
     exit 1
 fi
 
-#plot_patterns=('plot-k32-202*.plot' 'SPECIAL_PATTERN_1' 'SPECIAL_PATTERN_2' 'SPECIAL_PATTERN_3' 'SPECIAL_PATTERN_4' 'SPECIAL_PATTERN_5' 'SPECIAL_PATTERN_6' 'SPECIAL_PATTERN_7' 'SPECIAL_PATTERN_8' 'SPECIAL_PATTERN_9' 'plot-k32-c10-*.plot' 'plot-k32-c11-*.plot' 'plot-k32-c12-*.plot' 'plot-k32-c13-*.plot' 'plot-k32-c14-*.plot' 'plot-k32-c15-*.plot' 'plot-k32-c16-*.plot' 'plot-k32-c17-*.plot' 'plot-k32-c18-*.plot' 'plot-k32-c19-*.plot' 'plot-k32-c20-*.plot')
-plot_patterns=('plot-k32-202*.plot' 'plot-k32-c1-*.plot' 'plot-k32-c2-*.plot' 'plot-k32-c3-*.plot' 'plot-k32-c4-*.plot' 'plot-k32-c5-*.plot' 'plot-k32-c6-*.plot' 'plot-k32-c7-*.plot' 'plot-k32-c8-*.plot' 'plot-k32-c9-*.plot' 'plot-k32-c10-*.plot' 'plot-k32-c11-*.plot' 'plot-k32-c12-*.plot' 'plot-k32-c13-*.plot' 'plot-k32-c14-*.plot' 'plot-k32-c15-*.plot' 'plot-k32-c16-*.plot' 'plot-k32-c17-*.plot' 'plot-k32-c18-*.plot' 'plot-k32-c19-*.plot' 'plot-k32-c20-*.plot')
+plot_patterns=('plot-k32-202*.plot' 'SPECIAL_PATTERN_1' 'SPECIAL_PATTERN_2' 'SPECIAL_PATTERN_3' 'SPECIAL_PATTERN_4' 'SPECIAL_PATTERN_5' 'SPECIAL_PATTERN_6' 'SPECIAL_PATTERN_7' 'SPECIAL_PATTERN_8' 'SPECIAL_PATTERN_9' 'plot-k32-c10-*.plot' 'plot-k32-c11-*.plot' 'plot-k32-c12-*.plot' 'plot-k32-c13-*.plot' 'plot-k32-c14-*.plot' 'plot-k32-c15-*.plot' 'plot-k32-c16-*.plot' 'plot-k32-c17-*.plot' 'plot-k32-c18-*.plot' 'plot-k32-c19-*.plot' 'plot-k32-c20-*.plot')
 min_free_space_bytes=$((min_free_space * 1073741824)) # minimum free space in bytes
 IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
 disks_replotted=0
@@ -129,10 +128,21 @@ is_running_as_systemd_service
 running_as_systemd_service=$?
 
 # Function to sleep for the specified interval before repeating the loop
-sleep_interval() {
+sleep_interval_simple() {
     echo
     echo -e "waiting ${CYAN}$interval${RESET} seconds"
     sleep "$interval"
+}
+
+sleep_interval() {
+    local countdown="$interval"
+    echo -e
+    while [ $countdown -gt 0 ]; do
+        echo -ne "waiting ${CYAN}$countdown${RESET} seconds...\r"
+        sleep 1
+        ((countdown--))
+    done
+    echo -ne '\n'
 }
 
 # Check if duf is installed
@@ -193,34 +203,28 @@ find_disks() {
 }
 
 
-
-
+# Identify replotted disks
 get_replotted_disks() {
-    replotted_disks_array=()  # Array to store replotted disks
-    disks_replotted=0  # Counter for replotted disks
+    replotted_disks_array=()  # Array to store the names of replotted disks
+    disks_replotted=0  # Counter for the number of replotted disks
 
     for disk in "${disks[@]}"; do
         contains_unwanted_plots=false
-
-        # Check for each undesired pattern in the current disk
-        for pattern_index in "${replot_levels_arr[@]}"; do
-            pattern="${plot_patterns[$pattern_index]}"
-            
-            # Using find to directly search for undesired plot patterns
-            if find "$disk" -maxdepth "$search_depth" -type f -name "$pattern" -print -quit | grep -q '.'; then
+        for level in "${replot_levels_arr[@]}"; do
+            # Check if disk contains plots of this compression level
+            plot_pattern="plot-k32-c${level}-*.plot"
+            if find "$disk" -maxdepth "$search_depth" -type f -name "$plot_pattern" -exec false {} +; then
                 contains_unwanted_plots=true
-                break  # Only need to find one match to mark the disk
+                break
             fi
         done
 
         if [ "$contains_unwanted_plots" = false ]; then
-            replotted_disks_array+=("$disk")  # Add disk to replotted array
-            ((disks_replotted++))  # Increment counter
+            replotted_disks_array+=("$disk")  # Add disk to replotted_disks_array
+            ((disks_replotted++))  # Increment the counter
         fi
     done
 }
-
-
 
 
 # Detailed info about paths to include for searching plot files
@@ -433,10 +437,16 @@ while true; do
     clear
     echo -e ${BOLD}Chiagarden plot_over${RESET}
     echo
+    display_config_info
+    display_free_disks_info
+    process_plot_files
+    sleep_interval
+  else
+    echo
+    display_config_info
+    display_free_disks_info
+    process_plot_files
+    sleep_interval_simple
   fi
-  display_config_info
-  display_free_disks_info
-  process_plot_files
-  sleep_interval
 done
 
