@@ -118,14 +118,18 @@ check_and_mount_dir() {
 
 # Manage plot files: Copy *.plot files and remove unused *.tmp files
 manage_plot_files() {
-    local plot_dir="$1"
+    local plot_dir="${1%/}"  
     local dest_dir="$2"
+
+    # Remove the '@' symbol if present in dest_dir
+    dest_dir="${dest_dir#@}"
+    
     local plot_files
     
     # Check for and copy *.plot files to the destination
     if plot_files=$(ls "${plot_dir}"/*.plot 2>/dev/null); then
         if [ -f "$chia_plot_copy_bin" ]; then
-            $chia_plot_copy_bin -d -t $dest_dir -- $plot_dir/*.plot
+            $chia_plot_copy_bin -d -t $dest_dir $plot_dir/*.plot
         else
             echo -e "${YELLOW}Warning: chia_plot_copy not found at $chia_plot_copy_bin${RESET}"
             echo "Please download chia_plot_copy from https://github.com/madMAx43v3r/chia-gigahorse"
@@ -222,7 +226,7 @@ main() {
     fi
 
     check_and_mount_dir "${tmpdir}"
-    manage_plot_files "${tmpdir}" "$dest_dir"  # Uncomment if needed
+    manage_plot_files "${tmpdir}" "${finaldir}"
     apply_guru_meditation "$lastminutes" "$max_reboots" "$cooldowntime" "$guru_meditation"
     start_plotter
 }
