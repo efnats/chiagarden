@@ -4,7 +4,7 @@ ChiaGarden is a collection of sysprep tools designed to build, manage, and maint
 
 If you agree that typing disk paths is a job you shouldn't be doing, then this is for you. If you are already plotted and have no intention of reformatting anything, do read on: ChiaGarden will let you uniquely label drives with a certain pattern (for example CHIA-[SERIALNR]) which then facilitates subsequent processing.
 
-And if you've already given out creative disk labels (Heinz, Hans and Franz, I guess) or if you think that changing disk labels may be destroying your plots (although that is not the case) here is good news, too
+And if you've already given out creative disk labels (Heinz, Hans and Franz, I guess) or if you think that changing disk labels may be destroying your plots (although that is not the case) here is good news, too:
 Most of the ChiaGarden tools offer you a choice between two operating modes:
 
 `--label` search and process plots based on disk labels.
