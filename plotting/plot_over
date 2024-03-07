@@ -93,7 +93,40 @@ else
     exit 1
 fi
 
-plot_patterns=('plot-k32-202*.plot' 'SPECIAL_PATTERN_1' 'SPECIAL_PATTERN_2' 'SPECIAL_PATTERN_3' 'SPECIAL_PATTERN_4' 'SPECIAL_PATTERN_5' 'SPECIAL_PATTERN_6' 'SPECIAL_PATTERN_7' 'SPECIAL_PATTERN_8' 'SPECIAL_PATTERN_9' 'plot-k32-c10-*.plot' 'plot-k32-c11-*.plot' 'plot-k32-c12-*.plot' 'plot-k32-c13-*.plot' 'plot-k32-c14-*.plot' 'plot-k32-c15-*.plot' 'plot-k32-c16-*.plot' 'plot-k32-c17-*.plot' 'plot-k32-c18-*.plot' 'plot-k32-c19-*.plot' 'plot-k32-c20-*.plot')
+plot_patterns=('plot-k32-202*.plot' \
+'plot-k32-c1-*.plot' \
+'plot-k32-c2-*.plot' \
+'plot-k32-c3-*.plot' \
+'plot-k32-c4-*.plot' \
+'plot-k32-c5-*.plot' \
+'plot-k32-c6-*.plot' \
+'plot-k32-c7-*.plot' \
+'plot-k32-c8-*.plot' \
+'plot-k32-c9-*.plot' \
+'plot-k32-c10-*.plot' \
+'plot-k32-c11-*.plot' \
+'plot-k32-c12-*.plot' \
+'plot-k32-c13-*.plot' \
+'plot-k32-c14-*.plot' \
+'plot-k32-c15-*.plot' \
+'plot-k32-c16-*.plot' \
+'plot-k32-c17-*.plot' \
+'plot-k32-c18-*.plot' \
+'plot-k32-c19-*.plot' \
+'plot-k32-c20-*.plot' \
+'plot-k32-c21-*.plot' \
+'plot-k32-c22-*.plot' \
+'plot-k32-c23-*.plot' \
+'plot-k32-c24-*.plot' \
+'plot-k32-c25-*.plot' \
+'plot-k32-c26-*.plot' \
+'plot-k32-c27-*.plot' \
+'plot-k32-c28-*.plot' \
+'plot-k32-c29-*.plot' \
+'plot-k32-c30-*.plot' \
+'plot-k32-c31-*.plot' \
+'plot-k32-c32-*.plot' \
+'plot-k32-c33-*.plot')
 min_free_space_bytes=$((min_free_space * 1073741824)) # minimum free space in bytes
 IFS=',' read -ra replot_levels_arr <<< "$replot_levels"
 disks_replotted=0
