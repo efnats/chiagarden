@@ -190,7 +190,7 @@ if __name__ == "__main__":
     # Constants definitions
     block_time = 18.75  # Average time for a block in seconds
     blocks_per_day = SECONDS_IN_A_DAY / block_time  # Number of blocks found per day
-    block_reward = 2  # XCH reward per block
+    block_reward = 1  # XCH reward per block
     farmers_reward_xch = blocks_per_day * block_reward  # Total XCH rewarded to farmers per day
     farmers_reward_usd = farmers_reward_xch * xch_price  # Total USD value of XCH rewarded to farmers per day
     uncompressed_plot_size_GiB = 101.4  # Size of an uncompressed plot in GiB
