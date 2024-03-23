@@ -46,8 +46,8 @@ The installer script will guide you through the installation process, copy neces
 Once you have installed ChiaGarden, use it to ensure all drives containing plot files are labeled with a unique label pattern (default: CHIA-[serialnr]). The chiainit tool can be used to (re)label available drives in your system. Relabeling a drive is a non-destructive action and will not delete any data on the drive.
 
 Refer to the instructions in each directory for further configuration and usage information.
-## Contributing
-Contributions to ChiaGarden are welcome. Feel free to submit pull requests or open issues to improve the tools and make them more useful for the Chia farming community.
+## Reaching out
+Contributions to ChiaGarden are welcome. Feel free to submit pull requests or open issues to improve the tools and make them more useful for the Chia farming community. Currently the best way to reach out is here via filing a github issue or using the [thread I created at chiaforum.com](https://chiaforum.com/t/chiagarden-a-toolkit-for-post-farming-on-linux/20919)
 
 ## License
 Chia Garden is released under the MIT License. See the LICENSE file for more information.
