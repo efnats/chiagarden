@@ -177,6 +177,19 @@ get_disks
             'plot-k32-c18-*.plot'
             'plot-k32-c19-*.plot'
             'plot-k32-c20-*.plot'
+            'plot-k32-c21-*.plot'
+            'plot-k32-c22-*.plot'
+            'plot-k32-c23-*.plot'
+            'plot-k32-c24-*.plot'
+            'plot-k32-c25-*.plot'
+            'plot-k32-c26-*.plot'
+            'plot-k32-c27-*.plot'
+            'plot-k32-c28-*.plot'
+            'plot-k32-c29-*.plot'
+            'plot-k32-c30-*.plot'
+            'plot-k32-c31-*.plot'
+            'plot-k32-c32-*.plot'
+            'plot-k32-c33-*.plot'
         )
 
         # Initialize an array to store the total counts and sizes
@@ -220,7 +233,7 @@ plots_distribution() {
     total_plots=0
     total_size=0
     total_effective_size=0
-    for i in {0..20}
+    for i in {0..33}
     do
         count="${counts[$i]}"
         # Skip the line if the count is zero
