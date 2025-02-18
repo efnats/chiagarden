@@ -456,7 +456,7 @@ unmount_action() {
     done < <(find /dev/disk/by-label -name "$label_pattern*")
     
     echo
-    echo -e "${GREEN}$found_disks disks unmounted.${RESET}"
+    echo -e "${GREEN}$found_disks disks unmounted${RESET}"
 }
 
 

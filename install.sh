@@ -170,7 +170,7 @@ install_mergerfs() {
     echo
 }
 
-create_drectories() {
+create_directories() {
 # Create /etc/chiagarden directory if it doesn't exist
 echo -e "\n${YELLOW}Checking for /etc/chiagarden directory...${NC}"
 if [[ ! -d /etc/chiagarden ]]; then
@@ -308,7 +308,7 @@ download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/cuda-p
 download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_copy" "chia_plot_copy"
 download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_sink" "chia_plot_sink"
 
-create_drectories
+create_directories
 copy_files
 
 echo -e "\n${YELLOW}Updating systemd services...${NC}"
