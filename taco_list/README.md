@@ -1,30 +1,86 @@
-# taco_list - a simple wrapper script for your chia mount points
+# taco_list
 
-A simple wrapper script to list your destination disks and execute any command with the given parameters. It will print a list of all your plotting mount points either in one line (default), or in a list format (`--format newline`). If redirected to a textfile this may be useful as input for various other tools, such as your docker-compose.yml (hello machinaris). Or you could directly pass the list to chia_plot_sink (example is in the configuration). Your imagination is the limit ;)
+List your Chia drives and output them in various formats. Useful for piping to other commands.
+
+## Features
+
+- **Label or path based** – Find drives by label pattern or mount directory
+- **Flexible output** – Space, newline, or CSV separated
+- **Subdirectory support** – Append a subdirectory to each path
+- **Command execution** – Pipe output directly to another command
 
 ## Usage
 
 ```bash
-./taco_list --mount-dir /path/to/dir [--subdir subdir_name] [--separator space|newline|csv]
+# List drives by label (default: CHIA)
+taco_list --label CHIA
+
+# List drives in a directory
+taco_list --mount-dir /mnt/plots
+
+# Add subdirectory to each path
+taco_list --label CHIA --subdir gigahorse
+
+# Different output formats
+taco_list --label CHIA --separator space
+taco_list --label CHIA --separator newline
+taco_list --label CHIA --separator csv
+
+# Wrap paths in quotes
+taco_list --label CHIA --quotes
+
+# Execute a command with the disk list
+taco_list --label CHIA --command "du -sh"
 ```
-or
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--mount-dir PATH` | List directories under this path |
+| `--label PATTERN` | Find drives with this label pattern (default: `CHIA`) |
+| `--subdir NAME` | Append subdirectory to each path |
+| `--separator TYPE` | Output format: `space`, `newline`, `csv` |
+| `--quotes` | Wrap each path in quotes |
+| `--command CMD` | Execute command with disk list as argument |
+
+## Examples
+
+### List all CHIA drives
 ```bash
-./taco_list --label CHIA [--subdir subdir_name] [--separator space|newline|csv]
+$ taco_list --label CHIA
+/media/user/CHIA-WD40EZAZ/
+/media/user/CHIA-ST8000DM/
+/media/user/CHIA-TOSHIBA01/
 ```
 
-## Arguments
-
-- `--mount-dir`: Specify the path to the directory where the disks are mounted.
-- `--label`: Specify the label of the disks to be used. If both, mount-dir or label are ommited, this is the default with CHIA
-- `--subdir`: (Optional) Specify a subdirectory inside each disk. Default is an empty string.
-- `--separator`: (Optional) Specify the output separator for the list of destination directories. Available options are `newline`(default), `space` and `csv`.
-- `--quotes`: (Optional) put each drives output in quotes
-- `--command`: (Optional) Secify the command which will be put ahead of the listed drives. For example "/usr/local/bin/plot_sink --". Default: echo -e
-
-## Example
-
-To find disks mounted under `/media/root/` with a subdirectory named `gigahorse` and display their paths in a newline-separated format, run:
-
+### Space-separated for commands
 ```bash
-./taco_list --mount-dir /media/root --subdir gigahorse --format newline
+$ taco_list --label CHIA --separator space
+/media/user/CHIA-WD40EZAZ/ /media/user/CHIA-ST8000DM/ /media/user/CHIA-TOSHIBA01/
 ```
+
+### With subdirectory
+```bash
+$ taco_list --label CHIA --subdir plots
+/media/user/CHIA-WD40EZAZ/plots
+/media/user/CHIA-ST8000DM/plots
+/media/user/CHIA-TOSHIBA01/plots
+```
+
+### Check disk usage
+```bash
+$ taco_list --label CHIA --command "df -h"
+```
+
+### Feed to chia_plot_sink
+```bash
+chia_plot_sink -- $(taco_list --label CHIA --subdir gigahorse --separator space)
+```
+
+## Use Cases
+
+- Generate disk lists for `chia_plot_sink`
+- Check free space across all farm drives
+- Run maintenance commands on all drives
+- Export drive list for scripts

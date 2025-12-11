@@ -1,67 +1,67 @@
-# chiainit - mass preparation (wipe, format and label) of hard drives for PoST farming
+# chiainit
 
-chiainit is a bash script that helps you prepare and manage hard drives for PoST (Proof of Space and Time) farming. It automates the process of wiping, formatting, and labeling multiple drives at once, making it easy to set up and maintain your Chia farming storage.
-Drives are automatically labelled with the pattern CHIA-[Serialnr].
-Other tools in this repo rely on drives being labelled in this fashion so they can be identified as CHIA drives.
+Mass-prepare hard drives for Chia farming. Format, partition, and label multiple drives in one command.
 
 ## Features
 
-- Mass sysprep for Chia farming
-- Supports XFS, EXT4 and NTFS filesystems
-- Label drives with custom prefixes
-- Lots of safety questions before doing anything
-- System drives (disks where any partition is mounted as /) are never processed
-- ~~Mounted drives are never processed~~
-- Supports various methods for drive selection (-all, --exclude, drive ranges like sda-sdbz)
+- **Batch operations** – Process ranges like `sda-sdz` in one command
+- **Smart labeling** – Uses drive serial numbers for unique labels (e.g., `CHIA-WD40EZAZ`)
+- **Non-destructive labeling** – Relabel existing drives without formatting
+- **Filesystem support** – XFS, ext4, NTFS
+- **Safety first** – Excludes system drives automatically, requires explicit confirmation for destructive actions
+
+## Usage
+
+```bash
+# List available drives
+chiainit --help
+
+# Label existing drives (non-destructive)
+chiainit --label sdb sdc sdd
+
+# Label a range of drives
+chiainit --label sda-sdz
+
+# Full initialization: wipe, format, and label
+chiainit --fstype xfs --init sda-sdz
+
+# Exclude specific drives
+chiainit --fstype ext4 --init --all --exclude sda sdb
+
+# Custom label prefix
+chiainit --label-prefix GIGA --label sda-sdf
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--wipe` | Wipe the specified drives |
+| `--format` | Format drives (requires `--fstype`) |
+| `--label` | Label drives (filesystem auto-detected) |
+| `--init` | Wipe + format + label in one step |
+| `--fstype [xfs\|ext4\|ntfs]` | Filesystem type for formatting |
+| `--label-prefix PREFIX` | Custom prefix (default: `CHIA`) |
+| `--all` | Operate on all drives (excluding system) |
+| `--exclude [drives]` | Exclude specific drives |
 
 ## Requirements
 
-- smartmontools
-- xfsprogs
-- ntfs-3g
+- `xfsprogs` (for XFS)
+- `smartmontools` (for serial number detection)
+- `ntfs-3g` (for NTFS)
+- `parted`
 
-## Usage
-<pre>
-Usage: chiainit [OPTIONS] [drive-range1] [drive-range2] [...] driveN
-Example: chiainit --fstype ext4 --init sda-sdm sdq-sdah sdbz
+## Safety
 
-Options
---help: Show help text
---wipe: Wipe the specified drives
---format: Format the specified drives (requires --fstype)
---label: Label the specified drives
---init: Wipe, format, and label the specified drives (requires --fstype)
---fstype [xfs|ext4|ntfs]: Specify the filesystem type
---label-prefix PREFIX: Specify a custom prefix for the drive labels (default: CHIA)
---all: Operate on all spinning drives (excluding system drive and mounted drives)
---exclude [drive1 drive2]: Exclude the specified drives from the operation
-</pre>
+Destructive operations (`--wipe`, `--format`, `--init`) require you to type:
 
-## Example
-
-Wipe, format (ext4) and label the given drives using the label Pattern CHIA-[SERIALNR]
-```bash
-./chiainit --fstype ext4 --init sda-sdz
+```
+YES I SACRIFICE THIS DATA
 ```
 
-Wipe, format (ext4) and label all spinning drives using the label Pattern CHIA-[SERIALNR], exclude sdg sdh and sdi
-```bash
-./chiainit --fstype ext4 --init --all --exclude sdg sdh sdi
-```
+System drives and mounted drives are automatically excluded.
 
-Label drives sda-sdz and sdaa-sdah with the pattern GIGA-[SERIALNR] (FSTYPE is auto-detected)
-```bash
-./chiainit --label --label-prefix GIGA sdx sdy sdz sdaa sdab
-```
+## Output
 
-## Warning
-
-While NTFS is generally supported via ntfs-3g it is highly discouraged to use any NTFS filesystem created on Linux for Windows.
-Read [here](https://unix.stackexchange.com/questions/617400/can-linux-corrupt-the-data-on-an-ntfs-partition) for more info.
-Thanks to @scrutinus and @limsandy for pointing me to this.
-
-## Contributing
-If you have suggestions for improvements or bug fixes, please feel free to submit a pull request or create an issue.
-
-## License
-This project is licensed under the MIT License. See the LICENSE file for details.
+Operations are logged to `./chiainit.log` with timestamps.
