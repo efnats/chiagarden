@@ -2,7 +2,7 @@
 
 All notable changes to ChiaGarden will be documented in this file.
 
-## [2.0.0] - 2025-01-XX
+## [2.0.0] - 2026-12-11
 
 Major release with improved tooling, documentation, and user experience.
 
