@@ -1,329 +1,625 @@
 #!/bin/bash
 
-# Description: Installer script for ChiaGarden - a set of Linux tools to build and manage a Chia post farm.
+# ChiaGarden Installer
+# Usage: ./install.sh [--core|--uninstall|--help]
 
-# Define colors
+set -e
+
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+BOLD='\033[1m'
+NC='\033[0m'
 
-# Define file migrations
-declare -A files_to_migrate=(
-    ["/usr/local/bin/plot_avg"]="/usr/local/bin/plot_timer"
-    #["/path/to/old_file2"]=""
+# Logging
+LOGFILE=""
+
+# Installation groups
+CORE_TOOLS=(
+    "chiainit"
+    "gardenmount"
+    "taco_list"
+    "plot_counter"
+    "cropgains"
 )
 
-# Define service migrations
-declare -A services_to_migrate=(
+PLOTTING_TOOLS=(
+    "plot_starter"
+    "plot_timer"
+    "plot_cleaner"
+    "plotsink"
+    "plot_over"
+    "plot_mover"
+)
+
+CORE_SERVICES=(
+    "gardenmount.service"
+)
+
+PLOTTING_SERVICES=(
+    "plot_starter.service"
+    "plotsink.service"
+    "plot_over.service"
+)
+
+# File migrations (old -> new, empty = delete)
+declare -A FILES_TO_MIGRATE=(
+    ["/usr/local/bin/plot_avg"]="/usr/local/bin/plot_timer"
+)
+
+# Service migrations (old -> new)
+declare -A SERVICES_TO_MIGRATE=(
     ["plot-starter.service"]="plot_starter.service"
     ["garden-mount.service"]="gardenmount.service"
 )
 
+# ============================================================================
+# HELPERS
+# ============================================================================
 
+usage() {
+    echo "ChiaGarden Installer"
+    echo
+    echo "Usage: $0 [OPTIONS]"
+    echo
+    echo "Options:"
+    echo "  --uninstall   Remove all ChiaGarden files"
+    echo "  --log [FILE]  Write installation log (default: ./chiagarden-install-DATE.log)"
+    echo "  --help        Show this help"
+    echo
+    echo "Run without options for interactive install."
+    echo
+    echo "Core tools:     ${CORE_TOOLS[*]}"
+    echo "Plotting tools: ${PLOTTING_TOOLS[*]}"
+    exit 0
+}
 
-# Check for root privileges
 check_root() {
-if [[ $EUID -ne 0 ]]; then
-  echo -e "${RED}This script must be run as root${NC}" 
-  exit 1
-fi
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${RED}This script must be run as root${NC}"
+        exit 1
+    fi
 }
 
-print_header() {
-# # ASCII art for the ChiaGarden logo
-# cat << "EOF"
-#  __ .      .__         .      
-# /  `|_ * _.[ __ _.._. _| _ ._ 
-# \__.[ )|(_][_./(_][  (_](/,[ )
-# EOF
-# echo "_______________________________"
-  echo -e
-  echo -e "${GREEN}ChiaGarden Installer${NC}"
-  echo -e
-  echo -e "Installing ChiaGarden and its dependencies."
-  echo -e "To cancel at any time, press ${YELLOW}Ctrl+C${NC}."
-  echo
-  read -p "Proceed? [Y/n] " -r -e -i "Y" proceed_response
-
-  if [[ ! "$proceed_response" =~ ^([yY][eE][sS]|[yY])?$ ]]; then
-    echo -e "${YELLOW}Installation cancelled. Exiting now.${NC}"
-    exit 1
-  fi
+confirm() {
+    local prompt="$1"
+    local default="${2:-Y}"
+    local options="[Y/n]"
+    [[ "$default" == "N" ]] && options="[y/N]"
+    read -p "$prompt $options " -r response
+    response=${response:-$default}
+    [[ "$response" =~ ^[yY]([eE][sS])?$ ]]
 }
+
+# ============================================================================
+# MIGRATIONS (for upgrades from older versions)
+# ============================================================================
 
 migrate_files() {
-    local array_name=$1
-    declare -n file_pairs=$array_name
-    local migration_found=false
-
-    #echo "Checking for migration candidates of files..."
-
-    for old_file in "${!file_pairs[@]}"; do
-        new_file=${file_pairs[$old_file]}
-
-        if [ -f "$old_file" ]; then
-            migration_found=true
-            if [ -n "$new_file" ]; then
+    local migrated=false
+    for old_file in "${!FILES_TO_MIGRATE[@]}"; do
+        new_file=${FILES_TO_MIGRATE[$old_file]}
+        if [[ -f "$old_file" ]]; then
+            migrated=true
+            if [[ -n "$new_file" ]]; then
                 mv "$old_file" "$new_file"
-                echo "Renamed $old_file to $new_file"
+                echo -e "Renamed $old_file → $new_file"
             else
                 rm "$old_file"
-                echo "Removed $old_file"
+                echo -e "Removed $old_file"
             fi
         fi
     done
-
-    if [ "$migration_found" = false ]; then
-        echo "No migration required for files."
-    fi
+    $migrated || echo "No file migrations needed."
 }
 
-
-
-migrate_service_files() {
-    local array_name=$1
-    declare -n service_pairs=$array_name
-    local migration_found=false
-
-    #echo "Checking for migration candidates of services..."
-
-    for old_service in "${!service_pairs[@]}"; do
-        new_service=${service_pairs[$old_service]}
-
-        if [ -f "/etc/systemd/system/$old_service" ]; then
-            migration_found=true
-            if systemctl is-enabled --quiet "$old_service"; then
-                systemctl disable "$old_service"
-            fi
-
-            if [ -n "$new_service" ]; then
+migrate_services() {
+    local migrated=false
+    for old_service in "${!SERVICES_TO_MIGRATE[@]}"; do
+        new_service=${SERVICES_TO_MIGRATE[$old_service]}
+        if [[ -f "/etc/systemd/system/$old_service" ]]; then
+            migrated=true
+            systemctl disable "$old_service" 2>/dev/null || true
+            if [[ -n "$new_service" ]]; then
                 mv "/etc/systemd/system/$old_service" "/etc/systemd/system/$new_service"
-                echo "Renamed $old_service to $new_service"
+                echo -e "Renamed $old_service → $new_service"
             else
                 rm "/etc/systemd/system/$old_service"
-                echo "Removed $old_service"
+                echo -e "Removed $old_service"
             fi
         fi
     done
-
-    if [ "$migration_found" = true ]; then
-        systemctl daemon-reload
-        echo "Systemd daemon reloaded"
-    else
-        echo "No migration required for services."
-    fi
+    $migrated && systemctl daemon-reload
+    $migrated || echo "No service migrations needed."
 }
 
+# ============================================================================
+# DEPENDENCIES
+# ============================================================================
 
-
-
-
-# Dependencies
 install_dependencies() {
-echo -e "\n${YELLOW}Updating package list and installing dependencies...${NC}"
-apt update
-apt install -y curl lsb-release xfsprogs ntfs-3g smartmontools parted bc python3 python3-pip
-pip3 install colorama
-pip3 install requests
+    echo -e "\n${YELLOW}Installing dependencies...${NC}"
+    apt-get update -qq
+    apt-get install -y curl lsb-release xfsprogs ntfs-3g smartmontools parted bc python3 python3-pip duf
+
+    # Handle pip differently for Ubuntu 24+ (PEP 668)
+    if pip3 install --help 2>&1 | grep -q "break-system-packages"; then
+        pip3 install --break-system-packages colorama requests
+    else
+        pip3 install colorama requests
+    fi
 }
 
 install_mergerfs() {
     echo -e "\n${YELLOW}Installing mergerfs...${NC}"
-    # Get the OS release name
-    os_release=$(lsb_release -cs)
-
-    # Determine CPU architecture
-    cpu_arch=$(uname -m)
-    if [ "$cpu_arch" == "x86_64" ]; then
-        cpu_arch="amd64"
+    
+    # Detect distro and codename
+    local distro=""
+    local codename=""
+    
+    if [[ -f /etc/os-release ]]; then
+        source /etc/os-release
+        case "$ID" in
+            ubuntu)
+                distro="ubuntu"
+                codename="$VERSION_CODENAME"
+                ;;
+            debian)
+                distro="debian"
+                codename="$VERSION_CODENAME"
+                ;;
+            *)
+                # Try parent distro (for derivatives like Linux Mint)
+                if [[ "$ID_LIKE" == *"ubuntu"* ]]; then
+                    distro="ubuntu"
+                    codename="$UBUNTU_CODENAME"
+                elif [[ "$ID_LIKE" == *"debian"* ]]; then
+                    distro="debian"
+                    codename="$VERSION_CODENAME"
+                fi
+                ;;
+        esac
     fi
-
-    # Fetch the latest version from GitHub
-    latest_version=$(curl -s "https://api.github.com/repos/trapexit/mergerfs/releases/latest" | grep tag_name | cut -d '"' -f 4 | tr -d 'v')
-
-    # Create a URL based on detected OS release and CPU architecture
-    url="https://github.com/trapexit/mergerfs/releases/download/${latest_version}/mergerfs_${latest_version}.ubuntu-${os_release}_${cpu_arch}.deb"
-
-    # Download the .deb file
-    echo "Downloading mergerfs from $url..."
-    curl -L $url -o /tmp/mergerfs.deb
-
-    # Check if the download was successful
-    if [ $? -ne 0 ]; then
-        echo "Error downloading the .deb file from GitHub. Falling back to package maintainer's version."
-        sudo apt-get update
-        sudo apt-get install -y mergerfs
-        if [ $? -ne 0 ]; then
-            echo "Error installing mergerfs from the package repository. Exiting."
-            exit 1
-        fi
-    else
-        # Install the .deb file
-        echo "Installing mergerfs..."
-        sudo dpkg -i /tmp/mergerfs.deb
+    
+    # Fallback to lsb_release
+    if [[ -z "$codename" ]]; then
+        codename=$(lsb_release -cs 2>/dev/null || echo "")
+    fi
+    
+    # Detect architecture
+    local arch=""
+    case "$(uname -m)" in
+        x86_64)  arch="amd64" ;;
+        aarch64) arch="arm64" ;;
+        armv7l)  arch="armhf" ;;
+        i686)    arch="i386" ;;
+        riscv64) arch="riscv64" ;;
+        *)       arch="" ;;
+    esac
+    
+    # Get latest version from GitHub
+    local version=""
+    version=$(curl -fsSL "https://api.github.com/repos/trapexit/mergerfs/releases/latest" 2>/dev/null \
+        | grep '"tag_name"' | cut -d'"' -f4)
+    
+    if [[ -z "$version" || -z "$distro" || -z "$codename" || -z "$arch" ]]; then
+        echo -e "${YELLOW}Could not detect system or fetch version, falling back to apt...${NC}"
+        apt-get install -y mergerfs
+        return
+    fi
+    
+    # Build URL: mergerfs_2.41.1.ubuntu-noble_amd64.deb
+    local filename="mergerfs_${version}.${distro}-${codename}_${arch}.deb"
+    local url="https://github.com/trapexit/mergerfs/releases/download/${version}/${filename}"
+    
+    echo "Detected: ${distro} ${codename} (${arch})"
+    echo "Downloading mergerfs ${version}..."
+    
+    if curl -fsSL "$url" -o /tmp/mergerfs.deb && [[ -f /tmp/mergerfs.deb ]] && [[ $(stat -c%s /tmp/mergerfs.deb 2>/dev/null || echo 0) -gt 1000 ]]; then
+        dpkg -i /tmp/mergerfs.deb
         rm /tmp/mergerfs.deb
+        echo -e "${GREEN}mergerfs ${version} installed.${NC}"
+    else
+        echo -e "${YELLOW}Download failed for ${filename}${NC}"
+        echo -e "${YELLOW}Falling back to apt...${NC}"
+        rm -f /tmp/mergerfs.deb
+        apt-get install -y mergerfs
     fi
-
-    echo -e "${GREEN}Installation or update completed.${NC}"
-    echo
 }
 
-create_directories() {
-# Create /etc/chiagarden directory if it doesn't exist
-echo -e "\n${YELLOW}Checking for /etc/chiagarden directory...${NC}"
-if [[ ! -d /etc/chiagarden ]]; then
-    echo -e "${YELLOW}Creating /etc/chiagarden directory...${NC}"
-    mkdir /etc/chiagarden
-    echo -e "${GREEN}/etc/chiagarden directory created.${NC}"
-else
-    echo -e "${GREEN}/etc/chiagarden${NC} directory already exists."
-fi
-}
+# ============================================================================
+# MADMAX BINARIES
+# ============================================================================
 
-copy_files() {
-    # Copy files
-    echo -e "\n${YELLOW}Copying ChiaGarden files...${NC}"
-    files_to_copy=(
-      "./chiainit/chiainit"
-      "./gardenmount/gardenmount"
-      "./cropgains/cropgains"
-      "./plot_counter/plot_counter"
-      "./plot_mover/plot_mover"
-      "./plot_over/plot_over"
-      "./plot_starter/plot_starter"
-      "./plot_timer/plot_timer"
-      "./plot_cleaner/plot_cleaner"
-      "./plotsink/plotsink"
-      "./taco_list/taco_list"
-    )   
-
-    for file in "${files_to_copy[@]}"; do
-      if [[ -e $file ]]; then
-        cp $file /usr/local/bin/
-        echo -e "${GREEN}Copied${NC} $file ${GREEN}to /usr/local/bin/${NC}"
-      else
-        echo -e "${RED}Error: File $file not found${NC}"
-        exit 1
-      fi
-    done
-}
-
-# Function to download madmax binaries
 download_madmax() {
     local file_url="$1"
     local file_name="$2"
-
-    if [[ ! -e /usr/local/bin/$file_name ]]; then
-        echo -e "${YELLOW}${file_name} not found. Downloading the latest version from GitHub...${NC}"
-
-        # Download the file directly using the provided URL
-        curl -L -o "/usr/local/bin/${file_name}" "$file_url"
-
-        # After downloading, give execute permissions
-        chmod +x "/usr/local/bin/${file_name}"
-
-        echo -e "${GREEN}${file_name} downloaded and saved to /usr/local/bin/${NC}"
+    
+    if [[ -e "/usr/local/bin/$file_name" ]]; then
+        echo -e "${GREEN}$file_name${NC} already exists."
+        return
+    fi
+    
+    echo -e "Downloading $file_name..."
+    if curl -fsSL "$file_url" -o "/usr/local/bin/$file_name"; then
+        chmod +x "/usr/local/bin/$file_name"
+        echo -e "${GREEN}$file_name installed.${NC}"
     else
-        echo -e "${GREEN}${file_name}${NC} already exists in /usr/local/bin/"
+        echo -e "${RED}Failed to download $file_name${NC}"
     fi
 }
 
-# Function to update systemd service files
-update_service_file() {
-    local service_dir="$1"
-    local service_file="$2"
-    local service_path="/etc/systemd/system/${service_file}"
+install_madmax_binaries() {
+    echo -e "\n${YELLOW}Downloading MadMax binaries...${NC}"
+    local base="https://github.com/madMAx43v3r/chia-gigahorse/raw/master"
+    
+    download_madmax "${base}/cuda-plotter/linux/x86_64/cuda_plot_k32" "cuda_plot_k32"
+    download_madmax "${base}/plot-sink/linux/x86_64/chia_plot_copy" "chia_plot_copy"
+    download_madmax "${base}/plot-sink/linux/x86_64/chia_plot_sink" "chia_plot_sink"
+}
 
-    # Check for the existence of the service file in the system directory
-    if [[ -e "${service_path}" ]]; then
-        # Compare the existing service file with the new one
-        if ! cmp -s "${service_dir}/${service_file}" "${service_path}"; then
-            echo -e "${YELLOW}A modified ${service_file} exists.${NC}"
-            # Ask the user what to do
-            read -p "Do you want to backup the existing file and replace with the new one? [Y/n] " user_decision
+# ============================================================================
+# TOOL INSTALLATION
+# ============================================================================
 
-            if [[ ! "$user_decision" =~ ^([nN][oO]|[nN])$ ]]; then
-                # Backup the original file
-                mv "${service_path}" "${service_path}.bak"
-                echo -e "${GREEN}Backup created:${NC} ${service_path}/${service_file}.bak"
+copy_tool() {
+    local tool="$1"
+    local src="./${tool}/${tool}"
+    
+    if [[ -e "$src" ]]; then
+        cp "$src" /usr/local/bin/
+        echo -e "${GREEN}Installed${NC} $tool"
+    else
+        echo -e "${RED}Error: $src not found${NC}"
+        exit 1
+    fi
+}
 
-                # Copy the new service file
-                cp "${service_dir}/${service_file}" "${service_path}"
-                echo -e "${GREEN}${service_file}${NC} has been updated."
-            else
-                echo -e "${RED}Skipping update for${NC} ${service_file}."
-            fi
+install_service() {
+    local tool="$1"
+    local service="${tool}.service"
+    local src="./${tool}/${service}"
+    local dest="/etc/systemd/system/${service}"
+    
+    [[ ! -f "$src" ]] && return
+    
+    if [[ -f "$dest" ]] && ! cmp -s "$src" "$dest"; then
+        echo -e "${YELLOW}Service $service has local changes.${NC}"
+        if confirm "Backup and replace?"; then
+            mv "$dest" "${dest}.bak"
+            cp "$src" "$dest"
+            echo -e "Backed up and updated $service"
         else
-            echo -e "${GREEN}No changes detected in${NC} ${service_file}, ${GREEN}skipping update.${NC}"
+            echo -e "Skipped $service"
         fi
-        echo
     else
-        # If the service file doesn't exist, simply copy it
-        cp "${service_dir}/${service_file}" "${service_path}"
-        echo -e "${GREEN}Installed new ${service_file}.${NC}"
+        cp "$src" "$dest"
+        echo -e "${GREEN}Installed${NC} $service"
     fi
 }
 
-# Function to get the current status of a service
-get_service_status() {
-  if systemctl is-enabled --quiet "$1"; then
-    echo "ENABLED"
-  else
-    echo "DISABLED"
-  fi
+prompt_enable_service() {
+    local service="$1"
+    local description="$2"
+    
+    [[ ! -f "/etc/systemd/system/$service" ]] && return
+    
+    local state="OFF"
+    systemctl is-enabled --quiet "$service" 2>/dev/null && state="ON"
+    local original_state="$state"
+    
+    # Format service name (remove .service suffix for cleaner look)
+    local name="${service%.service}"
+    
+    while true; do
+        # Build status indicator
+        local indicator
+        if [[ "$state" == "ON" ]]; then
+            indicator="${GREEN}●${NC} ON "
+        else
+            indicator="${RED}○${NC} OFF"
+        fi
+        
+        echo -ne "\r\033[K  ${indicator}  ${BOLD}${name}${NC} – ${description}  [space/enter]"
+        
+        IFS= read -rsn1 key
+        
+        if [[ -z "$key" ]]; then  # Enter
+            echo -ne "\r\033[K"  # Clear line before final output
+            break
+        elif [[ "$key" == " " ]]; then  # Space
+            if [[ "$state" == "ON" ]]; then
+                state="OFF"
+            else
+                state="ON"
+            fi
+        fi
+    done
+    
+    # Final display
+    local indicator
+    local changed=""
+    if [[ "$state" == "ON" ]]; then
+        indicator="${GREEN}●${NC} ON "
+    else
+        indicator="${RED}○${NC} OFF"
+    fi
+    
+    if [[ "$state" != "$original_state" ]]; then
+        if [[ "$state" == "ON" ]]; then
+            systemctl enable "$service" >/dev/null 2>&1
+        else
+            systemctl disable "$service" >/dev/null 2>&1
+        fi
+        changed=" ${GREEN}✓${NC}"
+    fi
+    
+    echo -e "  ${indicator}  ${BOLD}${name}${NC} – ${description}${changed}"
 }
 
-# Function to prompt for enabling/disabling a service
-prompt_service_action() {
-  local service=$1
-  local description=$2
-  local status=$(get_service_status "$service")
-  echo -e "${YELLOW}Service: $service ($description)${NC}"
-  read -p "Status: $status. Enable service? [Y/n] " enable_response
-  if [[ ! "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
-    echo -e "${GREEN}Enabling $service...${NC}"
-    systemctl enable "$service"
-  elif [[ "$enable_response" =~ ^([nN][oO]|[nN])$ ]]; then
-    echo -e "${GREEN}Disabling $service...${NC}"
-    systemctl disable "$service"
-  fi
-  echo -e
+configure_services() {
+    local include_plotting="${1:-true}"
+    
+    echo -e "  ${YELLOW}space${NC}=toggle  ${YELLOW}enter${NC}=next\n"
+    
+    prompt_enable_service "gardenmount.service" "Mount drives on boot"
+    
+    if [[ "$include_plotting" == "true" ]]; then
+        prompt_enable_service "plot_starter.service" "Start plotter on boot"
+        prompt_enable_service "plotsink.service" "Receive plots over network"
+        prompt_enable_service "plot_over.service" "Keep drives free for replotting"
+    fi
 }
 
+# ============================================================================
+# INSTALL
+# ============================================================================
 
-clear
-check_root
-print_header
-echo -e ${YELLOW}"Checking for migration candidates.."${NC}
-migrate_files "files_to_migrate"
-migrate_service_files "services_to_migrate"
-install_dependencies
+do_install() {
+    clear
+    echo -e "${GREEN}${BOLD}"
+    cat << 'EOF'
+   ____ _     _        ____               _            
+  / ___| |__ (_) __ _ / ___| __ _ _ __ __| | ___ _ __  
+ | |   | '_ \| |/ _` | |  _ / _` | '__/ _` |/ _ \ '_ \ 
+ | |___| | | | | (_| | |_| | (_| | | | (_| |  __/ | | |
+  \____|_| |_|_|\__,_|\____|\__,_|_|  \__,_|\___|_| |_|
+EOF
+    echo -e "${NC}"
+    echo -e "  ${BOLD}Linux toolkit for large-scale Chia farming${NC}"
+    echo
+    
+    echo "What would you like to do?"
+    echo
+    echo -e "  ${BOLD}1)${NC} Core only"
+    echo "     Drive management and monitoring (no plotting)"
+    echo
+    echo -e "  ${BOLD}2)${NC} Core + Plotting tools"
+    echo "     Everything you need to run and plot a Chia farm"
+    echo
+    echo -e "  ${BOLD}3)${NC} Configure services only"
+    echo "     Enable/disable systemd services"
+    echo
+    
+    local choice
+    read -p "Choose [1]: " choice
+    choice=${choice:-1}
+    
+    local install_plotting="true"
+    local services_only="false"
+    case "$choice" in
+        1) install_plotting="false" ;;
+        2) install_plotting="true" ;;
+        3) services_only="true" ;;
+        *)
+            echo -e "${RED}Invalid choice.${NC}"
+            exit 1
+            ;;
+    esac
+    
+    # Services only mode
+    if [[ "$services_only" == "true" ]]; then
+        echo -e "\n${YELLOW}Configure services...${NC}\n"
+        configure_services true
+        echo -e "\n${GREEN}Done.${NC}\n"
+        exit 0
+    fi
+    
+    # Show what will be installed
+    echo
+    echo -e "${YELLOW}The following will be installed:${NC}"
+    echo
+    echo -e "${BOLD}APT packages:${NC}"
+    echo "  curl, lsb-release, xfsprogs, ntfs-3g, smartmontools, parted, bc,"
+    echo "  python3, python3-pip, duf, mergerfs"
+    echo
+    echo -e "${BOLD}Python packages:${NC}"
+    echo "  colorama, requests"
+    echo
+    echo -e "${BOLD}ChiaGarden tools:${NC}"
+    echo -n "  "
+    local tools=("${CORE_TOOLS[@]}")
+    if [[ "$install_plotting" == "true" ]]; then
+        tools+=("${PLOTTING_TOOLS[@]}")
+    fi
+    local first=true
+    for tool in "${tools[@]}"; do
+        if $first; then
+            echo -n "$tool"
+            first=false
+        else
+            echo -n ", $tool"
+        fi
+    done
+    echo
+    
+    if [[ "$install_plotting" == "true" ]]; then
+        echo
+        echo -e "${BOLD}MadMax binaries:${NC}"
+        echo "  cuda_plot_k32, chia_plot_copy, chia_plot_sink"
+    fi
+    
+    echo
+    if ! confirm "Do you want to continue?"; then
+        echo -e "${YELLOW}Cancelled.${NC}"
+        exit 0
+    fi
+    
+    # Migrations
+    echo -e "\n${YELLOW}Checking for migrations...${NC}"
+    migrate_files
+    migrate_services
+    
+    # Dependencies
+    install_dependencies
+    install_mergerfs
+    
+    # MadMax binaries (only if plotting)
+    [[ "$install_plotting" == "true" ]] && install_madmax_binaries
+    
+    # Config directory
+    echo -e "\n${YELLOW}Creating directories...${NC}"
+    mkdir -p /etc/chiagarden
+    echo -e "${GREEN}/etc/chiagarden${NC} ready."
+    
+    # Copy tools
+    echo -e "\n${YELLOW}Installing tools...${NC}"
+    for tool in "${CORE_TOOLS[@]}"; do
+        copy_tool "$tool"
+    done
+    
+    if [[ "$install_plotting" == "true" ]]; then
+        for tool in "${PLOTTING_TOOLS[@]}"; do
+            copy_tool "$tool"
+        done
+    fi
+    
+    # Install services
+    echo -e "\n${YELLOW}Installing services...${NC}"
+    for tool in "${CORE_TOOLS[@]}"; do
+        install_service "$tool"
+    done
+    
+    if [[ "$install_plotting" == "true" ]]; then
+        for tool in "${PLOTTING_TOOLS[@]}"; do
+            install_service "$tool"
+        done
+    fi
+    
+    systemctl daemon-reload
+    
+    # Enable services
+    echo -e "\n${YELLOW}Configure services...${NC}\n"
+    configure_services "$install_plotting"
+    
+    # Done
+    echo -e "\n${BOLD}${GREEN}ChiaGarden installed!${NC}\n"
+    echo -e "Get started:"
+    echo -e "  ${YELLOW}chiainit --help${NC}      Label or format your drives"
+    echo -e "  ${YELLOW}gardenmount --help${NC}   Mount and combine drives"
+    echo
+    echo -e "Each tool has a README in its directory for details."
+    echo
+}
 
-install_mergerfs
-echo -e "${YELLOW}Downloading madMAx's binaries required for plot_starter https://github.com/madMAx43v3r...${NC}"
-download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/cuda-plotter/linux/x86_64/cuda_plot_k32" "cuda_plot_k32"
-download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_copy" "chia_plot_copy"
-download_madmax "https://github.com/madMAx43v3r/chia-gigahorse/raw/master/plot-sink/linux/x86_64/chia_plot_sink" "chia_plot_sink"
+# ============================================================================
+# UNINSTALL
+# ============================================================================
 
-create_directories
-copy_files
+do_uninstall() {
+    echo -e "\n${RED}${BOLD}ChiaGarden Uninstaller${NC}\n"
+    echo "This will remove all ChiaGarden tools and services."
+    echo -e "${YELLOW}MadMax binaries and /etc/chiagarden configs will be kept.${NC}"
+    echo
+    
+    if ! confirm "Proceed?" "N"; then
+        echo -e "${YELLOW}Cancelled.${NC}"
+        exit 0
+    fi
+    
+    # Stop and disable services
+    echo -e "\n${YELLOW}Stopping services...${NC}"
+    for service in "${CORE_SERVICES[@]}" "${PLOTTING_SERVICES[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            systemctl stop "$service"
+            echo "Stopped $service"
+        fi
+        if systemctl is-enabled --quiet "$service" 2>/dev/null; then
+            systemctl disable "$service"
+            echo "Disabled $service"
+        fi
+        if [[ -f "/etc/systemd/system/$service" ]]; then
+            rm "/etc/systemd/system/$service"
+            echo "Removed $service"
+        fi
+    done
+    systemctl daemon-reload
+    
+    # Remove tools
+    echo -e "\n${YELLOW}Removing tools...${NC}"
+    for tool in "${CORE_TOOLS[@]}" "${PLOTTING_TOOLS[@]}"; do
+        if [[ -f "/usr/local/bin/$tool" ]]; then
+            rm "/usr/local/bin/$tool"
+            echo "Removed $tool"
+        fi
+    done
+    
+    echo -e "\n${GREEN}ChiaGarden uninstalled.${NC}"
+    echo -e "Kept: /etc/chiagarden/, MadMax binaries (cuda_plot_k32, chia_plot_sink, chia_plot_copy)"
+    echo
+}
 
-echo -e "\n${YELLOW}Updating systemd services...${NC}"
-update_service_file "./gardenmount" "gardenmount.service"
-update_service_file "./plot_starter" "plot_starter.service"
-update_service_file "./plotsink" "plotsink.service"
-update_service_file "./plot_over" "plot_over.service"
-systemctl daemon-reload
-echo -e
+# ============================================================================
+# MAIN
+# ============================================================================
 
-prompt_service_action "gardenmount.service" "Automount drives during boot"
-prompt_service_action "plot_starter.service" "Start plotting upon boot"
-prompt_service_action "plotsink.service" "Start MadMax's Plotsink on port 1337 during boot"
-prompt_service_action "plot_over.service" "Start plot_over on boot"
+main() {
+    local action="install"
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                usage
+                ;;
+            --uninstall)
+                action="uninstall"
+                shift
+                ;;
+            --log)
+                if [[ -n "${2:-}" && "${2:0:1}" != "-" ]]; then
+                    LOGFILE="$2"
+                    shift 2
+                else
+                    LOGFILE="./chiagarden-install-$(date +%Y%m%d-%H%M%S).log"
+                    shift
+                fi
+                ;;
+            *)
+                echo -e "${RED}Unknown option: $1${NC}"
+                usage
+                ;;
+        esac
+    done
+    
+    # Set up logging if requested
+    if [[ -n "$LOGFILE" ]]; then
+        echo "Logging to $LOGFILE"
+        exec > >(tee -a "$LOGFILE") 2>&1
+        echo "=== ChiaGarden Install Log $(date) ==="
+    fi
+    
+    # Execute action
+    check_root
+    case "$action" in
+        uninstall)
+            do_uninstall
+            ;;
+        *)
+            do_install
+            ;;
+    esac
+}
 
-echo -e "${BOLD}${GREEN}ChiaGarden installation complete!${NC}"
-echo -e "Please read the README.md files for more information on how to use ChiaGarden.\n"
-echo -e "${YELLOW}You may want to start by using chiainit to initialize your drives.${NC}\n"
-echo
+main "$@"
