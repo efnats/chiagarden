@@ -1,64 +1,165 @@
-# ChiaGarden
+# 🌱 ChiaGarden
 
-ChiaGarden is a collection of sysprep tools designed to build, manage, and maintain a PoST (Proof of Space and Time) farm on a linux based system. These tools make it easy to prepare and mount your hard disks, manage and monitor your plots for your farm.
+**Linux toolkit for managing large-scale Chia farms.**
 
-If you agree that typing disk paths is a job you shouldn't be doing, then this is for you. If you are already plotted and have no intention of reformatting anything, do read on: ChiaGarden will let you uniquely label drives with a certain pattern (for example CHIA-[SERIALNR]) which then facilitates subsequent processing.
+Format, label, mount, and manage hundreds of drives without typing a single disk path.
 
-And if you've already given out creative disk labels (Heinz, Hans and Franz, I guess) or if you think that changing disk labels may be destroying your plots (although that is not the case) here is good news, too:
-Most of the ChiaGarden tools offer you a choice between two operating modes:
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Shell](https://img.shields.io/badge/Shell-Bash-blue.svg)]()
 
-`--label` search and process plots based on disk labels.
-`--mount-dir` search and process plots based on mount points.
+---
 
-As long as your disks are mounted to the same mount point consistently, there's no distinction.
+## The Problem
 
-## Tools
+Managing a Chia farm means dealing with dozens or hundreds of hard drives. Typing `/dev/sdxx` paths is tedious and error-prone. Keeping track of mounts, plots, and disk health becomes a nightmare.
 
-### Disk Setup
+## The Solution
 
-- **[chiainit](https://github.com/efnats/chiagarden/tree/main/chiainit)** - Bash script for preparing hard drives for PoST farming. Automates the process of formatting and labeling multiple drives at once.
+ChiaGarden labels your drives with a pattern like `CHIA-WD40EZAZ` (using the serial number), then handles everything based on that label. Mount all drives with one command. Count plots across all disks. Automate replotting. No more path juggling.
 
-- **[gardenmount](https://github.com/efnats/chiagarden/tree/main/gardenmount)** - Script for (un)mounting drives based on a specified label prefix. Includes systemd service files for managing the mounting and unmounting process.
+---
 
-### Plotting
-
-- **[plot_starter](https://github.com/efnats/chiagarden/tree/main/plot_starter)** - Automates starting the plotting process on boot.
-
-- **[plotsink](https://github.com/efnats/chiagarden/tree/main/plotsink)** - Wrapper for MadMax's plot sink to receive plots over the network.
-
-- **[plot_mover](https://github.com/efnats/chiagarden/tree/main/plot_mover)** - Moves completed plots to destination drives.
-
-- **[plot_over](https://github.com/efnats/chiagarden/tree/main/plot_over)** - Manages overwriting old plots with new ones.
-
-- **[plot_counter](https://github.com/efnats/chiagarden/tree/main/plot_counter)** - Counts plots across your drives.
-
-- **[plot_cleaner](https://github.com/efnats/chiagarden/tree/main/plot_cleaner)** - Cleans up incomplete or invalid plot files.
-
-- **[plot_timer](https://github.com/efnats/chiagarden/tree/main/plot_timer)** - Monitors and reports plotting times.
-
-### Farming & Utilities
-
-- **[cropgains](https://github.com/efnats/chiagarden/tree/main/cropgains)** - Analyzes farming performance and earnings.
-
-- **[taco_list](https://github.com/efnats/chiagarden/tree/main/taco_list)** - Simple wrapper script to list your destination disks and execute any command with the given parameters - for example chia_plot_sink.
-
-## Getting Started
-
-To get started with ChiaGarden, clone the repository, and run the installer script install.sh.
+## Quick Start
 
 ```bash
 git clone https://github.com/efnats/chiagarden.git
 cd chiagarden
 sudo ./install.sh
 ```
-The installer script will guide you through the installation process, copy necessary files, and optionally enable and start the garden-mount.service.
 
-Once you have installed ChiaGarden, use it to ensure all drives containing plot files are labeled with a unique label pattern (default: CHIA-[serialnr]). The chiainit tool can be used to (re)label available drives in your system. Relabeling a drive is a non-destructive action and will not delete any data on the drive.
+Then initialize your drives:
 
-Refer to the README in each tool's directory for further configuration and usage information.
+```bash
+# List available drives
+sudo chiainit --list
 
-## Reaching out
-Contributions to ChiaGarden are welcome. Feel free to submit pull requests or open issues to improve the tools and make them more useful for the Chia farming community. Currently the best way to reach out is here via filing a github issue or using the [thread I created at chiaforum.com](https://chiaforum.com/t/chiagarden-a-toolkit-for-post-farming-on-linux/20919)
+# Label drives (non-destructive, keeps your plots!)
+sudo chiainit --label-only
+
+# Mount all labeled drives
+sudo gardenmount --mount --label CHIA
+```
+
+---
+
+## How Mounting Works
+
+ChiaGarden uses a label-based mounting system combined with mergerfs to make your farm appear as a single filesystem.
+
+### Step 1: Individual Mounts
+
+When you run `gardenmount --mount --label CHIA`, every drive matching `CHIA-*` gets mounted to its own directory:
+
+```
+/media/user/
+├── CHIA-WD40EZAZ/     # 18TB drive
+├── CHIA-ST8000DM/     # 8TB drive
+├── CHIA-TOSHIBA01/    # 16TB drive
+└── ...
+```
+
+### Step 2: Slack Space
+
+Chia plots are fixed-size (~108GB for k32). An 18TB drive fits 166 plots but has ~180GB leftover – unusable for plots, but not for other data.
+
+The `--slack` option creates a `slack.img` file on each drive's remaining space, combines them via loop devices into a btrfs raid0, and mounts it:
+
+```
+/mnt/slack/            # Combined slack space from all drives
+```
+
+### Step 3: Unified View with mergerfs
+
+With `--mergerfs`, gardenmount creates a mergerfs mount that combines **everything** – all individual drives plus the slack space – into one unified filesystem:
+
+```
+/mnt/garden/           # All drives + slack as one filesystem
+```
+
+This is where your plotter writes to. ChiaGarden distributes files across drives automatically.
+
+### Example Setup
+
+```bash
+# Mount everything: individual drives, slack, then merge it all
+sudo gardenmount --mount --label CHIA --mergerfs --slack
+
+# Result:
+# /media/user/CHIA-*/     Individual drives
+# /mnt/slack/             Leftover space combined (btrfs raid0)
+# /mnt/garden/            Everything merged (HDDs + slack)
+```
+
+---
+
+## Tools
+
+| Tool | Description |
+|------|-------------|
+| **chiainit** | Format and label drives with a consistent naming pattern |
+| **gardenmount** | Mount/unmount drives by label prefix. Includes systemd service |
+| **plot_starter** | Automate plotting on boot |
+| **plotsink** | Receive plots over network (wraps MadMax's chia_plot_sink) |
+| **plot_mover** | Move completed plots to destination drives |
+| **plot_over** | Replace old plots with new ones |
+| **plot_counter** | Count plots across all drives |
+| **plot_cleaner** | Remove incomplete/invalid plots |
+| **plot_timer** | Monitor plotting performance |
+| **cropgains** | Track farming rewards and performance |
+| **taco_list** | List drives and pipe to other commands |
+
+Each tool has its own README with detailed usage in its directory.
+
+---
+
+## Two Operating Modes
+
+Already have custom disk labels? No problem. All tools support two modes:
+
+```bash
+# By label pattern (recommended)
+gardenmount --mount --label CHIA
+
+# By mount directory
+gardenmount --mount --mount-dir /mnt/chia
+```
+
+---
+
+## Requirements
+
+- Ubuntu 20.04+ (other Debian-based distros should work)
+- Root access for disk operations
+- Python 3 (for cropgains)
+
+The installer handles all dependencies including mergerfs.
+
+---
+
+## Systemd Services
+
+ChiaGarden includes service files for automation:
+
+| Service | Purpose |
+|---------|---------|
+| `gardenmount.service` | Auto-mount drives on boot |
+| `plot_starter.service` | Start plotting on boot |
+| `plotsink.service` | Run plot sink server on port 1337 |
+| `plot_over.service` | Continuous replotting |
+
+Enable with: `sudo systemctl enable gardenmount.service`
+
+---
+
+## Contributing
+
+Issues and PRs welcome! 
+
+- [GitHub Issues](https://github.com/efnats/chiagarden/issues)
+- [Chia Forum Thread](https://chiaforum.com/t/chiagarden-a-toolkit-for-post-farming-on-linux/20919)
+
+---
 
 ## License
-Chia Garden is released under the MIT License. See the LICENSE file for more information.
+
+MIT – see [LICENSE](LICENSE)
