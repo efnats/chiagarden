@@ -2,6 +2,18 @@
 
 Automatically delete old plots to make room for new ones during replotting. Ensures a configurable number of drives always have free space.
 
+## Why Keep Multiple Disks Free?
+
+Modern GPU plotters create plots in 2-5 minutes. These plots are initially written to a fast NVMe SSD, then transferred to HDDs for permanent storage. The problem: **a single HDD is too slow to keep up with GPU plotting speed.**
+
+The solution is parallel writes to multiple HDDs. MadMax's [`chia_plot_sink`](https://github.com/madMAx43v3r/chia-plot-sink) distributes incoming plots across all available drives simultaneously. But this only works if multiple drives have free space ready to receive plots.
+
+`plot_over` ensures you always have N drives with enough free space by automatically deleting the oldest plots of specified compression levels. This keeps your replotting pipeline flowing without manual intervention.
+
+**Example:** With `amount_free_disks=3`, you always have 3 HDDs ready. While one receives a plot, the next two are standing by. By the time all three have received a plot, the first one is ready again.
+
+> **See also:** [plotsink](../plotsink/) wraps `chia_plot_sink` and uses [taco_list](../taco_list/) to automatically discover all your CHIA drives—no manual drive list needed.
+
 ## Features
 
 - **Smart deletion** – Removes oldest plots of specified compression levels

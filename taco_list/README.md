@@ -73,14 +73,14 @@ $ taco_list --label CHIA --subdir plots
 $ taco_list --label CHIA --command "df -h"
 ```
 
-### Feed to chia_plot_sink
+### Feed to [`chia_plot_sink`](https://github.com/madMAx43v3r/chia-plot-sink)
 ```bash
 chia_plot_sink -- $(taco_list --label CHIA --subdir gigahorse --separator space)
 ```
 
 ## Use Cases
 
-- Generate disk lists for `chia_plot_sink`
+- Generate disk lists for [`chia_plot_sink`](https://github.com/madMAx43v3r/chia-plot-sink)
 - Check free space across all farm drives
 - Run maintenance commands on all drives
 - Export drive list for scripts

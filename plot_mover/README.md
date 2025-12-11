@@ -2,6 +2,14 @@
 
 Watch a directory for completed plots and automatically move them to a destination.
 
+## Note: For Larger Farms
+
+`plot_mover` is a simple, single-threaded tool—it moves one plot at a time to one destination. There's no parallelization or automatic selection of free HDDs.
+
+I wrote this mainly for completeness (and because I like the name). **For larger farms, I recommend using MadMax's [chia_plot_sink](https://github.com/madMAx43v3r/chia-plot-sink)**, which writes to multiple HDDs in parallel and keeps up with fast GPU plotters. See [plotsink](../plotsink/) for a convenient wrapper.
+
+`plot_mover` is still useful for simple setups or when you just need to move plots to a single destination (like a mergerfs mount or NAS).
+
 ## Features
 
 - **Directory watching** – Monitors source directory for new `.plot` files
