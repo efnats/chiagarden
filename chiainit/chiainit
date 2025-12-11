@@ -22,6 +22,7 @@ FSTYPE=""
 DRY_RUN=false
 LOGFILE=""
 SHOW_SMART=false
+INIT_FAILED=false
 
 # Function to set up logging if requested
 setup_logging() {
@@ -244,6 +245,8 @@ format() {
     # Partition, sync, and format the drive
         sudo parted /dev/$drive --script mklabel gpt mkpart primary $FSTYPE 0% 100%
         sudo sync
+        sudo partprobe /dev/$drive
+        sleep 0.5  # Give kernel time to create device node
         if [ "$FSTYPE" == "xfs" ]; then
             sudo mkfs.xfs ${XFSOPTIONS} /dev/$partition
         elif [ "$FSTYPE" == "ext4" ]; then
@@ -260,14 +263,14 @@ format() {
 # Function to initialize a drive (wipe, format, and label)
 init() {
     drive=$1
+    INIT_FAILED=false
     
     execute_action "--wipe" "$drive" "" ""
     execute_action "--format" "$drive" "" ""
     execute_action "--label" "$drive" "" ""
     
-    # Check if initialization succeeded by verifying label exists
-    local label=$(get_label "${drive}1")
-    [[ -n "$label" ]]
+    # Return failure status (set by execute_action when called from init)
+    ! $INIT_FAILED
 }
 
 
@@ -601,6 +604,7 @@ execute_action() {
                     echo -e "${progress}\e[31m✖\e[0m ${CYAN}/dev/$drive${RESET} wiping...... ${RED}failed${RESET}"
                     echo "$output"
                     [[ -n "$current" ]] && ((failed_count++))
+                    [[ -z "$current" ]] && INIT_FAILED=true
                 fi
                 [[ -n "$LOGFILE" ]] && echo -e "\n$output" >> "$LOGFILE"
             fi
@@ -621,6 +625,7 @@ execute_action() {
                     echo -e "${progress}\e[31m✖\e[0m ${CYAN}/dev/$drive${RESET} formatting.. ${RED}failed${RESET}"
                     echo "$output"
                     [[ -n "$current" ]] && ((failed_count++))
+                    [[ -z "$current" ]] && INIT_FAILED=true
                 fi
                 [[ -n "$LOGFILE" ]] && echo "$output" >> "$LOGFILE"
             fi
@@ -645,6 +650,7 @@ execute_action() {
                     echo -e "${progress}\e[31m✖\e[0m ${CYAN}/dev/$drive${RESET} labeling.... ${RED}failed${RESET}"
                     echo "$output"
                     [[ -n "$current" ]] && ((failed_count++))
+                    [[ -z "$current" ]] && INIT_FAILED=true
                 fi
             fi
             ;;
