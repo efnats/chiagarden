@@ -13,14 +13,16 @@ Managing a Chia farm with 30, 50, or 100+ HDDs gets messy fast:
 
 ## The Solution: Label-Based Drive Management
 
-ChiaGarden uses **drive labels** as the single source of truth. Every drive gets a unique, permanent label based on its serial number (e.g., `CHIA-WD40EZAZ`). All tools reference drives by label pattern—not by device name or mount path.
+ChiaGarden uses **drive labels** to identify your farm drives. Every drive gets a unique label based on its serial number (e.g., `CHIA-WD40EZAZ`).
 
 **The foundation:**
 
 1. **[chiainit](chiainit/)** – Label existing drives, or mass-format new ones. Uses serial numbers for unique labels.
-2. **[gardenmount](gardenmount/)** – Mount/unmount all `CHIA-*` drives with one command, combine via mergerfs, recover slack space
+2. **[gardenmount](gardenmount/)** – Mount all `CHIA-*` drives and combine them into a single filesystem at `/mnt/garden/` using mergerfs. Also recovers slack space from partially-filled drives.
 
-Once your drives are labeled and mounted, every other tool "just works"—they all speak the same label-based language.
+The result: **one path, all your storage.** Your plotting tools, Chia harvester, and scripts just use `/mnt/garden/`— no need to know about individual drives.
+
+The other ChiaGarden tools use the label pattern internally for drive-specific operations (like keeping N drives free for replotting).
 
 ## Quick Start
 
@@ -86,7 +88,7 @@ ChiaGarden creates a unified view of all your storage:
          └──▶ /mnt/garden/      mergerfs union of all drives + slack
 ```
 
-Your plotting tools write to `/mnt/garden/`—mergerfs distributes files across all available drives automatically.
+Your plotting tools write to `/mnt/garden/`— mergerfs distributes files across all available drives automatically.
 
 ## Systemd Services
 
