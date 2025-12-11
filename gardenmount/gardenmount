@@ -1,5 +1,7 @@
 #!/bin/bash
 
+VERSION="1.0"
+
 btrfs_mounted_loop=""
 # Default max size for slack in bytes (110GB)
 max_size=$((110 * 1024 * 1024 * 1024)) # 110 GB the size of an uncompressed plot file
@@ -12,43 +14,114 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
+BOLD='\033[1m'
 RESET='\033[0m' # No Color
 
 
 usage() {
-    echo "Usage: $0 [--label LABEL_PATTERN] [--mount [MOUNT_POINT]]|--unmount [--read-only] [--mergerfs [MERGERFS_PATH]] [--slack [SLACK_PATH]] [--maxsize SIZE] [--no-prompt]"
-    echo "Example: $0 --mount --label 'CHIA'"
+    echo "Usage: gardenmount --mount|--unmount [OPTIONS]"
+    echo "Try 'gardenmount --help' for more information."
     exit 1
 }
 
 
+display_version() {
+    echo -e "${CYAN}gardenmount ${VERSION}${RESET}"
+}
+
+
 help() {
-    echo "Mounts or unmounts devices with a specified label pattern."
+    display_version
+    echo "Mount labeled drives and combine them with MergerFS"
     echo
-    echo "Usage: $0 [--mount [MOUNT_POINT]]|--unmount [--label LABEL_PATTERN] [--read-only] [--mergerfs [MERGERFS_PATH]] [--slack [SLACK_PATH]] [--maxsize SIZE] [--no-prompt]"
+    echo "Usage: gardenmount --mount|--unmount|--list [OPTIONS]"
+    echo
+    echo "Actions:"
+    echo "  --mount [PATH]              Mount drives (default: /media/\$USER)"
+    echo "  --unmount                   Unmount all drives, slack, and MergerFS"
+    echo "  --list                      Show status of drives, MergerFS, and slack"
     echo
     echo "Options:"
-    echo "  --mount [PATH]          Mount devices with the specified label pattern. Optionally, specify the mount point base directory (default: '/media/username')."
-    echo "  --unmount               Unmount devices with the specified label pattern. Unmount the MergerFS mountpoint if it exists."
-    echo "  --label PATTERN         Specify the label pattern of the devices to mount/unmount (default: 'CHIA')."
-    echo "  --read-only             Mount devices as read-only."
-    echo "  --mergerfs [PATH]       Use MergerFS to combine the mounted devices into a single drive-like filesystem. (default: '/mnt/garden')"
-    echo "  --slack [PATH]          Mount feature to mount raid0 using loop devices to make use of remaining disk space (default: '/mnt/slack')."
-    echo "  --maxsize SIZE          Set the maximum allowed size for slack space to be mounted in GB. Set this to higher than your expected plot file."
-    echo "  --no-prompt             Runs the script in non-interactive mode."
-    echo "  --print-fstab           Print the fstab entries to copy and paste into /etc/fstab. Better: use the systemd services provided in the chiagarden repository"
-    echo "  --help                  Display this help message and exit."
+    echo "  --label PATTERN             Label pattern to match (default: CHIA)"
+    echo "  --mergerfs [PATH]           Create MergerFS union (default: /mnt/garden)"
+    echo "  --slack [PATH]              Enable slack space recovery (default: /mnt/slack)"
+    echo "  --maxsize SIZE              Max slack size in GB (default: 110)"
+    echo "  --read-only                 Mount drives as read-only"
+    echo "  --no-prompt                 Non-interactive mode (for systemd)"
+    echo "  --print-fstab               Print fstab entries (use with --list)"
+    echo "  --help                      Show this help"
     echo
     echo "Examples:"
-    echo "mount disks with the label 'CHIA' and mount the MergerFS in /mnt/garden"
-    echo "gardenmount --mount --mergerfs"
-    echo "mount disks with the label 'GIGA', mount MergerFS in /mnt/garden, and mount slack space to /mnt/slack, skip mounting available space is larger than 80GB" 
-    echo "gardenmount --mount --label 'GIGA' --mergerfs --slack --maxsize 80"
-    echo "mount disks with the label 'CHIA' and print the fstab entries for the mounted disks and MergerFS"
-    echo "gardenmount --mount --print-fstab"
-    echo "mount disks with the label 'CHIA', MergerFS and slack with 80GB max, read-only and do not prompt for confirmation (for systemd)"
-    echo "gardenmount --mount --mergerfs --slack --maxsize 80 --read-only --no-prompt"
-    exit 1
+    echo "  gardenmount --list"
+    echo "  gardenmount --list --print-fstab"
+    echo "  gardenmount --mount --mergerfs"
+    echo "  gardenmount --mount --label FARM --mergerfs --slack"
+    echo "  gardenmount --mount --mergerfs --slack --maxsize 80"
+    echo "  gardenmount --mount --mergerfs --slack --read-only --no-prompt"
+    echo "  gardenmount --unmount"
+    exit 0
+}
+
+
+list_status() {
+    local mounted_count=0
+    
+    echo
+    echo -e "${BOLD}Drive            Size     Mounted                                  Slack${RESET}"
+    echo "-----            ----     -------                                  -----"
+    
+    while IFS= read -r disk; do
+        local label=$(basename "$disk")
+        local device=$(readlink -f "$disk")
+        local size=$(lsblk -dn -o SIZE "$device" 2>/dev/null | tr -d '[:space:]')
+        local mount_info=$(findmnt -n -o TARGET "$device" 2>/dev/null)
+        
+        local mounted_out slack_out
+        if [[ -n "$mount_info" ]]; then
+            mounted_out=$(printf "%-40s" "$mount_info")
+            ((mounted_count++))
+            
+            # Check for slack.img
+            if [[ -f "$mount_info/slack.img" ]]; then
+                local slack_size=$(du -h "$mount_info/slack.img" 2>/dev/null | cut -f1)
+                slack_out="${GREEN}${slack_size}${RESET}"
+            else
+                slack_out="-"
+            fi
+        else
+            mounted_out="${YELLOW}(not mounted)${RESET}                           "
+            slack_out="-"
+        fi
+        
+        printf "%-16s %-8s " "$label" "$size"
+        echo -e "${mounted_out} ${slack_out}"
+        
+    done < <(find /dev/disk/by-label -name "${label_pattern}*" 2>/dev/null | sort)
+    
+    echo
+    echo -e "${GREEN}${mounted_count} disks mounted${RESET}"
+    
+    # MergerFS status
+    echo
+    local mergerfs_info=$(findmnt -t fuse.mergerfs -n -o TARGET,SIZE 2>/dev/null)
+    if [[ -n "$mergerfs_info" ]]; then
+        local mergerfs_target=$(echo "$mergerfs_info" | awk '{print $1}')
+        local mergerfs_size=$(echo "$mergerfs_info" | awk '{print $2}')
+        echo -e "MergerFS:  ${GREEN}${mergerfs_target}${RESET} (${mergerfs_size})"
+    else
+        echo -e "MergerFS:  ${YELLOW}(not active)${RESET}"
+    fi
+    
+    # Slack status
+    local slack_mount=$(mount | grep 'type btrfs' | grep '/dev/loop' | awk '{print $3}')
+    if [[ -n "$slack_mount" ]]; then
+        local slack_size=$(df -h "$slack_mount" 2>/dev/null | tail -1 | awk '{print $2}')
+        local slack_used=$(df -h "$slack_mount" 2>/dev/null | tail -1 | awk '{print $3}')
+        echo -e "Slack:     ${GREEN}${slack_mount}${RESET} (${slack_used} / ${slack_size})"
+    else
+        echo -e "Slack:     ${YELLOW}(not active)${RESET}"
+    fi
+    echo
 }
 
 
@@ -136,7 +209,13 @@ mount_disk() {
     local device=$(readlink -f "$disk")
     local disk_mount_point="$mount_point/$(basename "$disk")"
     mkdir -p "$disk_mount_point"
-    mount -v -o "$mount_options" "$device" "$disk_mount_point" && mounted_devices+=("$device")
+    local output
+    output=$(mount -v -o "$mount_options" "$device" "$disk_mount_point" 2>&1)
+    local status=$?
+    echo "$output" | sed 's/\.$//'
+    if [ $status -eq 0 ]; then
+        mounted_devices+=("$device")
+    fi
 }
 
 get_gb() {
@@ -354,7 +433,8 @@ mount_action() {
     fi
 
     echo
-    echo -e "${GREEN}$found_disks disks found and processed.${RESET}"
+    echo -e "${GREEN}$found_disks disks mounted${RESET}"
+    echo
 }
 
 
@@ -457,6 +537,7 @@ unmount_action() {
     
     echo
     echo -e "${GREEN}$found_disks disks unmounted${RESET}"
+    echo
 }
 
 
@@ -489,6 +570,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --unmount)
             action="unmount"
+            shift
+            ;;
+        --list)
+            action="list"
             shift
             ;;
         --label)
@@ -556,14 +641,6 @@ mounted_devices=()
 case "$action" in
     "mount")
         mount_action
-
-        if [ "$print_fstab" == "yes" ]; then
-            if [ ${#mounted_devices[@]} -gt 0 ]; then
-                print_fstab_instructions
-            else
-                echo "No disks found with the label pattern: $label_pattern"
-            fi
-        fi
         ;;
 
     "unmount")
@@ -574,13 +651,48 @@ case "$action" in
         fi
         ;;
 
+    "list")
+        display_version
+        list_status
+        if [ "$print_fstab" == "yes" ]; then
+            # Populate mounted_devices for fstab output
+            while IFS= read -r disk; do
+                device=$(readlink -f "$disk")
+                mount_info=$(findmnt -n -o TARGET "$device" 2>/dev/null)
+                if [[ -n "$mount_info" ]]; then
+                    mounted_devices+=("$device")
+                    # Set mount_point from first mounted device
+                    if [[ -z "$mount_point" ]]; then
+                        mount_point=$(dirname "$mount_info")
+                    fi
+                fi
+            done < <(find /dev/disk/by-label -name "${label_pattern}*" 2>/dev/null)
+            
+            # Detect active MergerFS
+            mergerfs_info=$(findmnt -t fuse.mergerfs -n -o TARGET 2>/dev/null)
+            if [[ -n "$mergerfs_info" ]]; then
+                mergerfs_path="$mergerfs_info"
+                mergerfs_mount_options="use_ino,cache.files=full,minfreespace=5G,moveonenospc=true,dropcacheonclose=true,allow_other,fsname=garden,category.create=mfs"
+            fi
+            
+            # Detect active slack btrfs
+            btrfs_mounted_loop=$(mount | grep 'type btrfs' | grep '/dev/loop' | awk '{print $1}' | head -1)
+            
+            if [ ${#mounted_devices[@]} -gt 0 ]; then
+                print_fstab_instructions
+            else
+                echo "No mounted disks found with the label pattern: $label_pattern"
+            fi
+        fi
+        ;;
+
     "")
-        echo "Please specify an action: --mount or --unmount"
+        echo "Please specify an action: --mount, --unmount, or --list"
         usage
         ;;
 
     *)
-        echo "Invalid action: '$action'. Use '--mount' or '--unmount'."
+        echo "Invalid action: '$action'. Use '--mount', '--unmount', or '--list'."
         exit 1
         ;;
 esac
