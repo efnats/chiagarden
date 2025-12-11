@@ -16,22 +16,21 @@ RED="\033[31m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
-VERSION="V2.2"
+VERSION="V2.3"
 ACTION=""
 FSTYPE=""
+DRY_RUN=false
+LOGFILE=""
+SHOW_SMART=false
 
-# Default log file location
-logfile="./chiainit.log"
-
-# Function to prepend timestamp to each line of output
-prepend_timestamp() {
-    while IFS= read -r line; do
-        echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
-    done
+# Function to set up logging if requested
+setup_logging() {
+    if [[ -n "$LOGFILE" ]]; then
+        echo "Logging to $LOGFILE"
+        exec > >(tee -a "$LOGFILE") 2>&1
+        echo "=== ChiaInit Log $(date) ==="
+    fi
 }
-
-# Redirect both stdout and stderr, adding timestamps for the logfile
-exec > >(tee >(prepend_timestamp >> "$logfile")) 2> >(tee >(prepend_timestamp >> "$logfile") >&2)
 
 
 # Function to retrieve the serial number of a drive
@@ -73,6 +72,36 @@ get_drive_size() {
 }
 
 
+# Function to get SMART data for a drive
+get_smart_data() {
+    local drive=$1
+    local smart_output=$(sudo smartctl -A /dev/$drive 2>/dev/null)
+    local health=$(sudo smartctl -H /dev/$drive 2>/dev/null | grep -i "SMART overall-health" | awk -F': ' '{print $2}')
+    
+    # Temperature (ID 194 or 190)
+    local temp=$(echo "$smart_output" | grep -E "^ *194|^ *190" | head -1 | awk '{print $10}')
+    [[ -z "$temp" ]] && temp="-"
+    
+    # Power-On Hours (ID 9)
+    local hours=$(echo "$smart_output" | grep -E "^ *9 " | awk '{print $10}')
+    [[ -z "$hours" ]] && hours="-"
+    
+    # Reallocated Sectors (ID 5)
+    local realloc=$(echo "$smart_output" | grep -E "^ *5 " | awk '{print $10}')
+    [[ -z "$realloc" ]] && realloc="-"
+    
+    # Determine status
+    local status="OK"
+    if [[ "$health" != "PASSED" ]]; then
+        status="FAIL"
+    elif [[ "$realloc" != "-" && "$realloc" -gt 0 ]]; then
+        status="WARN"
+    fi
+    
+    echo "$temp $hours $realloc $status"
+}
+
+
 # Confirm destructive actions
 confirm_destructive_action() {
     drives=$@
@@ -93,12 +122,26 @@ confirm_destructive_action() {
 
 summarize_actions() {
     ntfs_warning=false
+    local drive_count=${#DRIVES[@]}
+    local excluded_count=${#EXCLUDED_LIST[@]}
     echo
     echo -e ${BOLD}"Operation Summary"${RESET}
-    echo -e "Drives     : ${BOLD}${DRIVES[@]}${RESET}"
-    echo -e "Excluded   : ${BOLD}${EXCLUDED_LIST[@]}${RESET}"
-    echo -e "Filesystem : ${BOLD}$FSTYPE${RESET}"
-    echo -e "Actions    : ${BOLD}${ACTION#--}${RESET}"
+    if $DRY_RUN; then
+        echo -e "${YELLOW}>>> DRY RUN - no changes will be made <<<${RESET}"
+    fi
+    printf "%-13s: ${BOLD}%s${RESET}\n" "Drives ($drive_count)" "${DRIVES[*]}"
+    if [[ $excluded_count -gt 0 ]]; then
+        printf "%-13s: ${BOLD}%s${RESET}\n" "Excluded ($excluded_count)" "${EXCLUDED_LIST[*]}"
+    fi
+    printf "%-13s: ${BOLD}%s${RESET}\n" "Filesystem" "$FSTYPE"
+    printf "%-13s: ${BOLD}%s${RESET}\n" "Actions" "${ACTION#--}"
+    if [[ "$ACTION" == "--label" || "$ACTION" == "--init" ]]; then
+        printf "%-13s: ${BOLD}%s${RESET}\n" "Label prefix" "$SERIALPREFIX"
+    fi
+    
+    if [[ "$ACTION" == "--label" ]]; then
+        echo -e "\n${GREEN}Note:${RESET} Labeling is non-destructive. Your data will be preserved."
+    fi
     echo
 
     # Check if any of the drives have the ntfs filesystem and display a warning
@@ -128,33 +171,31 @@ label() {
     drive=$1
     partition="${drive}1"
 
-    # Perform labeling and direct output to the logfile
-    {
-        echo -e "\n${BOLD}Labeling /dev/$partition${RESET}"
-        serial_number=$(get_serial_number "$drive")
-        uuid=$(get_uuid "$partition")
-        
-        if [ "$serial_number" == "UNKNOWN" ]; then
-            serial_number=$uuid
-        fi
-        label="${SERIALPREFIX}-${serial_number}"
-        FSTYPE=$(get_fs_type "$partition")
+    # Perform labeling
+    echo -e "\n${BOLD}Labeling /dev/$partition${RESET}"
+    serial_number=$(get_serial_number "$drive")
+    uuid=$(get_uuid "$partition")
+    
+    if [ "$serial_number" == "UNKNOWN" ]; then
+        serial_number=$uuid
+    fi
+    label="${SERIALPREFIX}-${serial_number}"
+    FSTYPE=$(get_fs_type "$partition")
 
-        case "$FSTYPE" in
-            xfs)
-                label=$(echo "$label" | cut -c 1-12)
-                sudo xfs_admin -L "$label" /dev/$partition
-                ;;
-            ext4)
-                label=$(echo "$label" | cut -c 1-16)
-                sudo e2label /dev/$partition "$label"
-                ;;
-            ntfs)
-                label=$(echo "$label" | cut -c 1-32)
-                sudo ntfslabel /dev/$partition "$label"
-                ;;
-        esac
-    } &>> "$logfile"
+    case "$FSTYPE" in
+        xfs)
+            label=$(echo "$label" | cut -c 1-12)
+            sudo xfs_admin -L "$label" /dev/$partition
+            ;;
+        ext4)
+            label=$(echo "$label" | cut -c 1-16)
+            sudo e2label /dev/$partition "$label"
+            ;;
+        ntfs)
+            label=$(echo "$label" | cut -c 1-32)
+            sudo ntfslabel /dev/$partition "$label"
+            ;;
+    esac
 
     local exit_status=$?
     return $exit_status
@@ -219,9 +260,14 @@ format() {
 # Function to initialize a drive (wipe, format, and label)
 init() {
     drive=$1
-    execute_action "--wipe" $drive
-    execute_action "--format" $drive
-    execute_action "--label" $drive
+    
+    execute_action "--wipe" "$drive" "" ""
+    execute_action "--format" "$drive" "" ""
+    execute_action "--label" "$drive" "" ""
+    
+    # Check if initialization succeeded by verifying label exists
+    local label=$(get_label "${drive}1")
+    [[ -n "$label" ]]
 }
 
 
@@ -278,6 +324,118 @@ expand_drive_range() {
 
 
 
+# List all drives with details
+list_drives() {
+    local show_smart=$1
+    shift
+    local drives=("$@")
+    local labeled=0
+    local unlabeled=0
+    
+    # If no drives specified, get all
+    if [[ ${#drives[@]} -eq 0 ]]; then
+        drives=($(get_drives))
+    fi
+    
+    echo
+    if [[ "$show_smart" == "true" ]]; then
+        echo -e "${BOLD}Drive        Size     Label            FS      Temp   Hours    Realloc  Status${RESET}"
+        echo "-----        ----     -----            --      ----   -----    -------  ------"
+    else
+        echo -e "${BOLD}Drive        Size     Label            Filesystem   Serial${RESET}"
+        echo "-----        ----     -----            ----------   ------"
+    fi
+    
+    for drive in "${drives[@]}"; do
+        local size=$(get_drive_size "$drive")
+        local partition="${drive}1"
+        local label=$(get_label "$partition" 2>/dev/null)
+        local fstype=$(get_fs_type "$partition" 2>/dev/null)
+        local serial=$(get_serial_number "$drive")
+        
+        # Track labeled/unlabeled and format output
+        local label_out fstype_out serial_out
+        if [[ -z "$label" ]]; then
+            label_out=$(printf "${YELLOW}%-16s${RESET}" "(none)")
+            ((unlabeled++))
+        else
+            label_out=$(printf "%-16s" "$label")
+            ((labeled++))
+        fi
+        
+        if [[ -z "$fstype" ]]; then
+            fstype_out=$(printf "${YELLOW}%-7s${RESET}" "(none)")
+        else
+            fstype_out=$(printf "%-7s" "$fstype")
+        fi
+        
+        printf "%-12s %-8s " "/dev/$drive" "$size"
+        
+        if [[ "$show_smart" == "true" ]]; then
+            local smart_data=$(get_smart_data "$drive")
+            local temp=$(echo "$smart_data" | awk '{print $1}')
+            local hours=$(echo "$smart_data" | awk '{print $2}')
+            local realloc=$(echo "$smart_data" | awk '{print $3}')
+            local status=$(echo "$smart_data" | awk '{print $4}')
+            
+            # Format temperature
+            local temp_out
+            if [[ "$temp" == "-" ]]; then
+                temp_out="${YELLOW}-${RESET}    "
+            else
+                temp_out="${temp}°C  "
+            fi
+            
+            # Format hours
+            local hours_out
+            if [[ "$hours" == "-" ]]; then
+                hours_out="${YELLOW}-${RESET}       "
+            else
+                hours_out=$(printf "%-8s" "$hours")
+            fi
+            
+            # Format reallocated sectors with color
+            local realloc_out
+            if [[ "$realloc" == "-" ]]; then
+                realloc_out="${YELLOW}-${RESET}       "
+            elif [[ "$realloc" -gt 0 ]]; then
+                realloc_out=$(printf "${YELLOW}%-8s${RESET}" "$realloc")
+            else
+                realloc_out=$(printf "%-8s" "$realloc")
+            fi
+            
+            # Format status with color
+            local status_out
+            case "$status" in
+                OK)   status_out="${GREEN}OK${RESET}" ;;
+                WARN) status_out="${YELLOW}WARN${RESET}" ;;
+                FAIL) status_out="${RED}FAIL${RESET}" ;;
+            esac
+            
+            echo -e "${label_out} ${fstype_out} ${temp_out} ${hours_out} ${realloc_out} ${status_out}"
+        else
+            if [[ "$serial" == "UNKNOWN" ]]; then
+                serial_out="${YELLOW}(unknown)${RESET}"
+            else
+                serial_out="$serial"
+            fi
+            # Adjust fstype width for non-smart output
+            if [[ -z "$fstype" ]]; then
+                fstype_out=$(printf "${YELLOW}%-12s${RESET}" "(none)")
+            else
+                fstype_out=$(printf "%-12s" "$fstype")
+            fi
+            echo -e "${label_out} ${fstype_out} ${serial_out}"
+        fi
+    done
+    
+    local total=${#drives[@]}
+    echo
+    echo -e "Found ${BOLD}${total}${RESET} drives (${GREEN}${labeled} labeled${RESET}, ${YELLOW}${unlabeled} unlabeled${RESET})"
+    echo
+}
+
+
 # Function to check if a drive has a mounted root partition
 is_system_drive() {
     drive=$1
@@ -328,23 +486,32 @@ display_help() {
     echo "Usage: chiainit [OPTIONS] drive1 drive2 ... driveN"
     echo "Mass-prepare hard drives for PoST farming"
     echo ""
+    echo "Actions:"
+    echo "  --list                      List drives with labels and details"
+    echo "  --wipe                      Wipe the specified drives"
+    echo "  --format                    Format the specified drives (requires --fstype)"
+    echo "  --label                     Label the specified drives (non-destructive)"
+    echo "  --init                      Wipe, format, and label (requires --fstype)"
+    echo ""
     echo "Options:"
-    echo "  --help                    : Show this help text"
-    echo "  --wipe                    : Wipe the specified drives"
-    echo "  --format                  : Format the specified drives (requires --fstype)"
-    echo "  --label                   : Label the specified drives (fstype is auto-detected)"
-    echo "  --init                    : Wipe, format, and label the specified drives (requires --fstype)"
-    echo "  --fstype [xfs|ext4|ntfs]  : Specify the filesystem type"
-    echo "  --label-prefix PREFIX     : Specify a custom prefix for the drive labels (default: CHIA)"
-    echo "  --all                     : Operate on all drives (excluding system drives)"
-    echo "  --exclude [drive1 drive2] : Exclude the specified drives from the operation"
+    echo "  --smart                     Show SMART data (use with --list)"
+    echo "  --fstype [xfs|ext4|ntfs]    Specify the filesystem type"
+    echo "  --label-prefix PREFIX       Custom label prefix (default: CHIA)"
+    echo "  --all                       Operate on all drives (excluding system drives)"
+    echo "  --exclude drive1 drive2     Exclude drives from the operation"
+    echo "  --dry-run                   Show what would be done without making changes"
+    echo "  --log [FILE]                Write log (default: ./chiainit-DATE.log)"
+    echo "  --help                      Show this help"
     echo ""
     echo "Examples:"
-    echo "  chiainit --label sdb sdc"
-    echo "  chiainit --fstype ext4 --init sda-sdz"
-    echo "  chiainit --fstype xfs --format sda-sdbz --exclude sdf sdg sdh"
-    echo "  chiainit --fstype ext4 --label --label-prefix GH sd sdc"
-    echo "  chiainit --fstype ext4 --init --all --exclude sda sdb sdc"
+    echo "  chiainit --list --all"
+    echo "  chiainit --list sda-sdd"
+    echo "  chiainit --list --smart sda sdb sdc"
+    echo "  chiainit --label sda sdb"
+    echo "  chiainit --label-prefix FARM --label sda sdb"
+    echo "  chiainit --fstype xfs --init sda-sdz"
+    echo "  chiainit --fstype xfs --init --all --exclude sda sdb"
+    echo "  chiainit --dry-run --fstype xfs --init sda-sdd"
 }
 
 
@@ -394,57 +561,92 @@ stop_spinner() {
 execute_action() {
     action=$1
     drive=$2
+    local current=$3
+    local total=$4
+    local progress=""
+    [[ -n "$current" && -n "$total" ]] && progress="[${current}/${total}] "
     local output
     local exit_status
     local drive_size=$(get_drive_size $drive)
 
     case "$action" in
         --init)
-            echo -e "\n${BOLD}${CYAN}[+] Drive /dev/$drive [$drive_size]${RESET}"
-            init $drive
+            echo -e "\n${BOLD}${CYAN}${progress}Drive /dev/$drive [$drive_size]${RESET}"
+            if $DRY_RUN; then
+                echo -e "  ${YELLOW}[DRY-RUN]${RESET} Would wipe /dev/$drive"
+                echo -e "  ${YELLOW}[DRY-RUN]${RESET} Would format /dev/$drive as $FSTYPE"
+                serial_number=$(get_serial_number "$drive")
+                [[ "$serial_number" == "UNKNOWN" ]] && serial_number=$(get_uuid "${drive}1" 2>/dev/null || echo "unknown")
+                echo -e "  ${YELLOW}[DRY-RUN]${RESET} Would label as ${SERIALPREFIX}-${serial_number}"
+            else
+                if init $drive; then
+                    ((success_count++))
+                else
+                    ((failed_count++))
+                fi
+            fi
             ;;
         --wipe)
-            start_spinner "/dev/$drive wiping"
-            output=$(wipe $drive 2>&1)
-            exit_status=$?
-            stop_spinner
-            if [ $exit_status -eq 0 ]; then
-                echo -e "\e[32m✔\e[0m ${CYAN}/dev/$drive${RESET} wiping...... ${GREEN}ok${RESET}"
+            if $DRY_RUN; then
+                echo -e "${YELLOW}${progress}[DRY-RUN]${RESET} Would wipe /dev/$drive [$drive_size]"
             else
-                echo -e "\e[31m✖\e[0m ${CYAN}/dev/$drive${RESET} wiping...... ${RED}failed${RESET}"
-                echo "$output"
+                start_spinner "${progress}/dev/$drive wiping"
+                output=$(wipe $drive 2>&1)
+                exit_status=$?
+                stop_spinner
+                if [ $exit_status -eq 0 ]; then
+                    echo -e "${progress}\e[32m✔\e[0m ${CYAN}/dev/$drive${RESET} wiping...... ${GREEN}ok${RESET}"
+                    [[ -n "$current" ]] && ((success_count++))
+                else
+                    echo -e "${progress}\e[31m✖\e[0m ${CYAN}/dev/$drive${RESET} wiping...... ${RED}failed${RESET}"
+                    echo "$output"
+                    [[ -n "$current" ]] && ((failed_count++))
+                fi
+                [[ -n "$LOGFILE" ]] && echo -e "\n$output" >> "$LOGFILE"
             fi
-            echo -e "\n$output" >> "$logfile"  # Log output irrespective of success or failure
             ;;
         --format)
-            start_spinner "/dev/$drive formatting"
-            output=$(format $drive 2>&1)
-            exit_status=$?
-            stop_spinner
-            if [ $exit_status -eq 0 ]; then
-                actual_fstype=$(get_fs_type "${drive}1")
-                echo -e "\e[32m✔\e[0m ${CYAN}/dev/$drive${RESET} formatting.. ${GREEN}$actual_fstype${RESET}"
+            if $DRY_RUN; then
+                echo -e "${YELLOW}${progress}[DRY-RUN]${RESET} Would format /dev/$drive [$drive_size] as $FSTYPE"
             else
-                echo -e "\e[31m✖\e[0m ${CYAN}/dev/$drive${RESET} formatting.. ${RED}failed${RESET}"
-                echo "$output"
+                start_spinner "${progress}/dev/$drive formatting"
+                output=$(format $drive 2>&1)
+                exit_status=$?
+                stop_spinner
+                if [ $exit_status -eq 0 ]; then
+                    actual_fstype=$(get_fs_type "${drive}1")
+                    echo -e "${progress}\e[32m✔\e[0m ${CYAN}/dev/$drive${RESET} formatting.. ${GREEN}$actual_fstype${RESET}"
+                    [[ -n "$current" ]] && ((success_count++))
+                else
+                    echo -e "${progress}\e[31m✖\e[0m ${CYAN}/dev/$drive${RESET} formatting.. ${RED}failed${RESET}"
+                    echo "$output"
+                    [[ -n "$current" ]] && ((failed_count++))
+                fi
+                [[ -n "$LOGFILE" ]] && echo "$output" >> "$LOGFILE"
             fi
-            echo "$output" >> "$logfile"  # Log output irrespective of success or failure
             ;;
         --label)
-            start_spinner "/dev/$drive labelling"
-            partition="${drive}1"
-            output=$(label $drive "$partition" 2>&1)
-            exit_status=$?
-            stop_spinner
-            echo "$output" >> "$logfile"  # Log output irrespective of success or failure
-            if [ $exit_status -eq 0 ]; then
-                actual_label=$(get_label "$partition")
-                echo -e "\e[32m✔\e[0m ${CYAN}/dev/$drive${RESET} labeling.... ${GREEN}${actual_label}${RESET}"
+            if $DRY_RUN; then
+                serial_number=$(get_serial_number "$drive")
+                [[ "$serial_number" == "UNKNOWN" ]] && serial_number=$(get_uuid "${drive}1" 2>/dev/null || echo "unknown")
+                echo -e "${YELLOW}${progress}[DRY-RUN]${RESET} Would label /dev/$drive [$drive_size] as ${SERIALPREFIX}-${serial_number}"
             else
-                echo -e "\e[31m✖\e[0m ${CYAN}/dev/$drive${RESET} labeling.... ${RED}failed${RESET}"
-                echo "$output"
+                start_spinner "${progress}/dev/$drive labelling"
+                partition="${drive}1"
+                output=$(label $drive "$partition" 2>&1)
+                exit_status=$?
+                stop_spinner
+                [[ -n "$LOGFILE" ]] && echo "$output" >> "$LOGFILE"
+                if [ $exit_status -eq 0 ]; then
+                    actual_label=$(get_label "$partition")
+                    echo -e "${progress}\e[32m✔\e[0m ${CYAN}/dev/$drive${RESET} labeling.... ${GREEN}${actual_label}${RESET}"
+                    [[ -n "$current" ]] && ((success_count++))
+                else
+                    echo -e "${progress}\e[31m✖\e[0m ${CYAN}/dev/$drive${RESET} labeling.... ${RED}failed${RESET}"
+                    echo "$output"
+                    [[ -n "$current" ]] && ((failed_count++))
+                fi
             fi
-            echo "$output" >> "$logfile"  # Log output irrespective of success or failure
             ;;
             
     esac
@@ -460,6 +662,14 @@ while [[ $# -gt 0 ]]; do
             ACTION="$1"
             shift
             ;;
+        --list)
+            ACTION="--list"
+            shift
+            ;;
+        --smart)
+            SHOW_SMART=true
+            shift
+            ;;
         --fstype)
             [[ "$2" =~ ^(xfs|ext4|ntfs)$ ]] && FSTYPE="$2" || { echo "Error: Unsupported filesystem type."; display_usage; exit 1; }
             shift 2
@@ -467,6 +677,19 @@ while [[ $# -gt 0 ]]; do
         --label-prefix)
             SERIALPREFIX="$2"
             shift 2
+            ;;
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --log)
+            if [[ -n "${2:-}" && "${2:0:1}" != "-" ]]; then
+                LOGFILE="$2"
+                shift 2
+            else
+                LOGFILE="./chiainit-$(date +%Y%m%d-%H%M%S).log"
+                shift
+            fi
             ;;
         --all)
             mapfile -t DRIVES < <(get_drives)
@@ -510,39 +733,39 @@ while [[ $# -gt 0 ]]; do
 done
 
 
-# Initialize an array to store excluded drives
+# Handle --list action
+if [[ "$ACTION" == "--list" ]]; then
+    display_version
+    # For --list, use DRIVES if specified, otherwise get all drives
+    if [[ ${#DRIVES[@]} -eq 0 ]]; then
+        mapfile -t DRIVES < <(get_drives)
+    fi
+    # Apply exclusions
+    LIST_DRIVES_FILTERED=()
+    for drive in "${DRIVES[@]}"; do
+        if [[ " ${EXCLUDED_DRIVES[*]} " != *"$drive"* ]]; then
+            LIST_DRIVES_FILTERED+=("$drive")
+        fi
+    done
+    list_drives "$SHOW_SMART" "${LIST_DRIVES_FILTERED[@]}"
+    exit 0
+fi
+
+
+# Initialize arrays
 EXCLUDED_LIST=()
-echo
-# Filter out the system drive, mounted drives, and user-excluded drives
-for i in "${!DRIVES[@]}"; do
-    is_excluded=false
-    if is_system_drive "${DRIVES[$i]}"; then
-        echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${DRIVES[$i]}${RESET} is a system drive. Excluding from operation."
-        is_excluded=true
-    #elif is_drive_mounted "${DRIVES[$i]}"; then
-    #    echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${DRIVES[$i]}${RESET} is mounted. Excluding from operation."
-    #    is_excluded=true
-    elif [[ " ${EXCLUDED_DRIVES[*]} " == *"${DRIVES[$i]}"* ]]; then
-        echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${DRIVES[$i]}${RESET} is manually excluded. Excluding from operation."
-        is_excluded=true
-    fi
-
-    if $is_excluded; then
-        EXCLUDED_LIST+=("${DRIVES[$i]}")
-    fi
-done
-
-# Temporary array for non-excluded drives
 NON_EXCLUDED_DRIVES=()
+echo
 
-# Filter out the system drive, mounted drives, and user-excluded drives
+# Filter out the system drive and user-excluded drives
 for drive in "${DRIVES[@]}"; do
-    #if is_system_drive "$drive" || is_drive_mounted "$drive" || [[ " ${EXCLUDED_DRIVES[*]} " == *"$drive"* ]]; then
-    if is_system_drive "$drive" || [[ " ${EXCLUDED_DRIVES[*]} " == *"$drive"* ]]; then
-        # Drive is excluded, do nothing
-        :
+    if is_system_drive "$drive"; then
+        echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${drive}${RESET} is a system drive. Excluding."
+        EXCLUDED_LIST+=("$drive")
+    elif [[ " ${EXCLUDED_DRIVES[*]} " == *"$drive"* ]]; then
+        echo -e "${YELLOW}INFO:${RESET} Drive ${BOLD}${drive}${RESET} is manually excluded."
+        EXCLUDED_LIST+=("$drive")
     else
-        # Add non-excluded drives to the temporary array
         NON_EXCLUDED_DRIVES+=("$drive")
     fi
 done
@@ -553,14 +776,19 @@ DRIVES=("${NON_EXCLUDED_DRIVES[@]}")
 
 check_fstype_issued
 check_drives_exist
+setup_logging
 summarize_actions
 
 
-# Check for and confirm destructive actions
- if [ "$ACTION" == "--wipe" ] || [ "$ACTION" == "--format" ] || [ "$ACTION" == "--init" ]; then
+# Check for and confirm destructive actions (skip in dry-run mode)
+if [[ "$ACTION" == "--wipe" || "$ACTION" == "--format" || "$ACTION" == "--init" ]] && ! $DRY_RUN; then
     confirm_destructive_action "${DRIVES[@]}"
-    #echo ""
- fi
+fi
+
+total=${#DRIVES[@]}
+current=0
+success_count=0
+failed_count=0
 
 
 for drive in "${DRIVES[@]}"; do
@@ -569,8 +797,16 @@ for drive in "${DRIVES[@]}"; do
         echo "Skipping operations on excluded drive: $drive"
         continue
     fi
-    execute_action "$ACTION" $drive
+    ((current++))
+    execute_action "$ACTION" "$drive" "$current" "$total"
 done
 
-echo -e "\nOperation complete for all specified drives.\n"
+if $DRY_RUN; then
+    echo -e "\n${YELLOW}Dry run complete. No changes were made.${RESET}\n"
+else
+    echo
+    echo -e "${BOLD}Summary${RESET}"
+    echo -e "${GREEN}Success: ${success_count}${RESET}  ${RED}Failed: ${failed_count}${RESET}"
+    echo
+fi
 
