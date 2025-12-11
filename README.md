@@ -12,25 +12,35 @@ Most of the ChiaGarden tools offer you a choice between two operating modes:
 
 As long as your disks are mounted to the same mount point consistently, there's no distinction.
 
-## chiainit
+## Tools
 
-[chiainit](https://github.com/efnats/chiagarden/tree/main/chiainit) is a bash script for preparing hard drives for PoST farming. It automates the process of formatting and labeling multiple drives at once.
+### Disk Setup
 
-## gardenmount
+- **[chiainit](https://github.com/efnats/chiagarden/tree/main/chiainit)** - Bash script for preparing hard drives for PoST farming. Automates the process of formatting and labeling multiple drives at once.
 
-[gardenmount](https://github.com/efnats/chiagarden/tree/main/gardenmount) is a script for (un)mounting drives based on a specified label prefix. Additionally, this repository provides systemd service files for managing the mounting and unmounting process.
+- **[gardenmount](https://github.com/efnats/chiagarden/tree/main/gardenmount)** - Script for (un)mounting drives based on a specified label prefix. Includes systemd service files for managing the mounting and unmounting process.
 
-## plotting
+### Plotting
 
-[plotting](https://github.com/efnats/chiagarden/tree/main/plotting) contains various scripts for managing, monitoring and automating the (re)plotting process.
+- **[plot_starter](https://github.com/efnats/chiagarden/tree/main/plot_starter)** - Automates starting the plotting process on boot.
 
-## farming
+- **[plotsink](https://github.com/efnats/chiagarden/tree/main/plotsink)** - Wrapper for MadMax's plot sink to receive plots over the network.
 
-[farming](https://github.com/efnats/chiagarden/tree/main/farming) contains various scripts for analyzing farming performance, specifically for chia.
+- **[plot_mover](https://github.com/efnats/chiagarden/tree/main/plot_mover)** - Moves completed plots to destination drives.
 
-## taco_list
+- **[plot_over](https://github.com/efnats/chiagarden/tree/main/plot_over)** - Manages overwriting old plots with new ones.
 
-[taco_list](https://github.com/efnats/chiagarden/tree/main/taco_list) is a simple wrapper script to list your destination disks and execute any command with the given parameters - for example chia_plot_sink
+- **[plot_counter](https://github.com/efnats/chiagarden/tree/main/plot_counter)** - Counts plots across your drives.
+
+- **[plot_cleaner](https://github.com/efnats/chiagarden/tree/main/plot_cleaner)** - Cleans up incomplete or invalid plot files.
+
+- **[plot_timer](https://github.com/efnats/chiagarden/tree/main/plot_timer)** - Monitors and reports plotting times.
+
+### Farming & Utilities
+
+- **[cropgains](https://github.com/efnats/chiagarden/tree/main/cropgains)** - Analyzes farming performance and earnings.
+
+- **[taco_list](https://github.com/efnats/chiagarden/tree/main/taco_list)** - Simple wrapper script to list your destination disks and execute any command with the given parameters - for example chia_plot_sink.
 
 ## Getting Started
 
@@ -45,11 +55,10 @@ The installer script will guide you through the installation process, copy neces
 
 Once you have installed ChiaGarden, use it to ensure all drives containing plot files are labeled with a unique label pattern (default: CHIA-[serialnr]). The chiainit tool can be used to (re)label available drives in your system. Relabeling a drive is a non-destructive action and will not delete any data on the drive.
 
-Refer to the instructions in each directory for further configuration and usage information.
+Refer to the README in each tool's directory for further configuration and usage information.
+
 ## Reaching out
 Contributions to ChiaGarden are welcome. Feel free to submit pull requests or open issues to improve the tools and make them more useful for the Chia farming community. Currently the best way to reach out is here via filing a github issue or using the [thread I created at chiaforum.com](https://chiaforum.com/t/chiagarden-a-toolkit-for-post-farming-on-linux/20919)
 
 ## License
 Chia Garden is released under the MIT License. See the LICENSE file for more information.
-
-

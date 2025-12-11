@@ -188,15 +188,14 @@ copy_files() {
     files_to_copy=(
       "./chiainit/chiainit"
       "./gardenmount/gardenmount"
-      "./farming/cropgains"
-      "./farming/analyze_lookup"
-      "./plotting/plot_counter"
-      "./plotting/plot_mover"
-      "./plotting/plot_over"
-      "./plotting/plot_starter"
-      "./plotting/plot_timer"
-      "./plotting/plot_cleaner"
-      "./plotting/plotsink.sh"
+      "./cropgains/cropgains"
+      "./plot_counter/plot_counter"
+      "./plot_mover/plot_mover"
+      "./plot_over/plot_over"
+      "./plot_starter/plot_starter"
+      "./plot_timer/plot_timer"
+      "./plot_cleaner/plot_cleaner"
+      "./plotsink/plotsink"
       "./taco_list/taco_list"
     )   
 
@@ -313,9 +312,9 @@ copy_files
 
 echo -e "\n${YELLOW}Updating systemd services...${NC}"
 update_service_file "./gardenmount" "gardenmount.service"
-update_service_file "./plotting" "plot_starter.service"
-update_service_file "./plotting" "plotsink.service"
-update_service_file "./plotting" "plot_over.service"
+update_service_file "./plot_starter" "plot_starter.service"
+update_service_file "./plotsink" "plotsink.service"
+update_service_file "./plot_over" "plot_over.service"
 systemctl daemon-reload
 echo -e
 
