@@ -5,6 +5,8 @@
 
 set -e
 
+VERSION="2.0.0"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -59,7 +61,7 @@ declare -A SERVICES_TO_MIGRATE=(
 # ============================================================================
 
 usage() {
-    echo "ChiaGarden Installer"
+    echo "ChiaGarden Installer v${VERSION}"
     echo
     echo "Usage: $0 [OPTIONS]"
     echo
@@ -387,7 +389,7 @@ do_install() {
   \____|_| |_|_|\__,_|\____|\__,_|_|  \__,_|\___|_| |_|
 EOF
     echo -e "${NC}"
-    echo -e "  ${BOLD}Linux toolkit for large-scale Chia farming${NC}"
+    echo -e "  ${BOLD}v${VERSION}${NC} - Linux toolkit for large-scale Chia farming"
     echo
     
     echo "What would you like to do?"
@@ -401,6 +403,9 @@ EOF
     echo -e "  ${BOLD}3)${NC} Configure services only"
     echo "     Enable/disable systemd services"
     echo
+    echo -e "  ${BOLD}4)${NC} Uninstall"
+    echo "     Remove ChiaGarden tools and services"
+    echo
     
     local choice
     read -p "Choose [1]: " choice
@@ -412,6 +417,7 @@ EOF
         1) install_plotting="false" ;;
         2) install_plotting="true" ;;
         3) services_only="true" ;;
+        4) do_uninstall; exit 0 ;;
         *)
             echo -e "${RED}Invalid choice.${NC}"
             exit 1
@@ -514,10 +520,10 @@ EOF
     configure_services "$install_plotting"
     
     # Done
-    echo -e "\n${BOLD}${GREEN}ChiaGarden installed!${NC}\n"
+    echo -e "\n${BOLD}${GREEN}ChiaGarden v${VERSION} installed!${NC}\n"
     echo -e "Get started:"
-    echo -e "  ${YELLOW}chiainit --help${NC}      Label or format your drives"
-    echo -e "  ${YELLOW}gardenmount --help${NC}   Mount and combine drives"
+    echo -e "  ${YELLOW}chiainit --list${NC}      Show your drives"
+    echo -e "  ${YELLOW}gardenmount --list${NC}   Show mount status"
     echo
     echo -e "Each tool has a README in its directory for details."
     echo

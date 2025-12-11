@@ -1,104 +1,88 @@
 # Changelog
 
-## Unreleased
+All notable changes to ChiaGarden will be documented in this file.
 
-### Chiagarden Changes
+## [2.0.0] - 2025-01-XX
 
-- **plot_counter**: 
-  - Don't display zero amount of plots to avoid division by zero. [efnats]
-  - New metrics: eTiB, Plots/Second (per Period) [efnats]
-  - Found a tiny bug while posting at chiaforum.com - fixed. [efnats]
-  - Bugfix: disk amount reported incorrectly. [efnats]
-  - Added support for directory based and label based scanning. [efnats]
-  - Add data and plots written counter. [efnats]
-  - Removed older version. [efnats]
-  - Commandline parameters added. [efnats]
-  - Added plot_counter. [efnats]
+Major release with improved tooling, documentation, and user experience.
 
-- **plot_cleaner**: 
-  - Added plot_cleaner: A script that cleans up your `-d` directory from unfinished plot files. [efnats]
+### Added
 
-- **plot_mover**: 
-  - Use rsync's built-in logging rather than our own. [efnats]
-  - Added plot_mover. [efnats]
+- **chiainit**: `--list` to show drives with labels, filesystem, serial numbers
+- **chiainit**: `--smart` option for SMART data (temp, hours, reallocated sectors)
+- **chiainit**: `--dry-run` to preview operations without making changes
+- **chiainit**: Progress counter `[1/32]` and completion summary
+- **chiainit**: Optional logging with `--log [FILE]`
+- **gardenmount**: `--list` to show status of drives, MergerFS, and slack
+- **gardenmount**: Version display
+- **install.sh**: Interactive menu with Core/Plotting/Full/Uninstall options
+- **install.sh**: Welcome screen with ASCII logo
+- **install.sh**: Optional logging with `--log [FILE]`
+- **Documentation**: Comprehensive README for all 11 tools with cross-references
 
-- **plot_over**: 
-  - Optimized logging for when run as a systemd service. Plot_over.service file included. Can now read config from `plot_over.config`. Location default: `/etc/chiagarden`, `~/.config/chiagarden/` or `./` [efnats]
-  - Add support for Gigahorse compression 11-15 and Bladebit. [efnats]
-  - Be more verbose about reasons not to remove more plots. [efnats]
-  - Added timestamps and logging, respect immutable flag. [efnats]
-  - Added check-routine for duf-utility. [efnats]
-  - Refactor of the entire code for better readability. Better plot processing. Bug fixes and some new debug options. [efnats]
-  - Added `--dry-run` mode. [efnats]
+### Changed
 
-- **plot_starter**: 
-  - Bugfix: wrong directories assignment. [efnats]
-  - Now supports all available options from cuda_plot for its configuration. [efnats]
-  - Added plot_starter. [efnats]
+- **chiainit**: Restructured help text (Actions/Options sections)
+- **gardenmount**: `--print-fstab` now works with `--list` instead of `--mount`
+- **gardenmount**: Restructured help text (Actions/Options sections)
+- **gardenmount**: Unified output formatting
+- **install.sh**: Complete rewrite with better system detection
 
-- **plot_timer**: 
-  - Added `--interval` command line argument. [efnats]
-  - New polished look, added total transfer amount and average speed. [efnats]
-  - Grouping by compression level added. [efnats]
-  - More comprehensive displays for plot timer shows average for phase 1-4 now. [efnats]
-  - Calculation of MB/s data written per period added. [efnats]
-  - Renamed to plot_timer. [efnats]
-  - Introduced calculation of plot amount which your earnings corresponds to (should-be plots) [efnats]
-  - Added script plot_avg: Calculate plotting speed per harvester. [efnats]
+### Fixed
 
-- **analyze_lookup**: 
-  - Added analyze_lookup: A tool to analyze lookup times. [efnats]
+- **chiainit**: Partition timing issue (device not ready after parted)
+- **chiainit**: `--init` failure tracking (was always showing success)
 
-- **cropgains**: 
-  - Major refactor. Added more metrics. Better appearance. [efnats]
-  - Timezone info. [efnats]
-  - Bugfix: calculation of 24hrs was wrong. [efnats]
-  - Added correct interpreter. [efnats]
-  - Added script - A chia profits monitoring tool. [efnats]
-  
-- **chiainit**: 
-  - Added support for overlapping drive ranges sda-sdaz etc. [efnats]
-  - Support for drive ranges added. Overlapping ranges (eg sdz-sdaa) not yet supported. [efnats]
-  - Removed dd (wipefs is sufficient) [efnats]
-  - Added option `--all` and `--exclude` for drive selection method. [efnats]
-  - In case of unknown serialnr uuid is being used now [efnats]
-  - Label function will now autodetect fstype. [efnats]
-  - Added warning to discourage use of NTFS-3G for Windows. [efnats]
-  - Bugfix - Labelling function was broken. Removed all spinners as a temporary solution. [efnats]
-  - Added option to print mount entries for copy/pasting in fstab. [efnats]
-  - Added chiainit. [efnats]
+---
 
-- **composerize**: 
-  - Add hostname, lanip, docker, timezone to env. [efnats]
-  - Full path of compose file was missing. [efnats]
-  - Added machinaris folder, added composerize. [efnats]
+## [1.0.0] - Previous releases
 
-- **gardenmount**: 
-  - Improve Disk Space Validation to account for min_size allowed in btrfs (131MB) [efnats]
-  - Updated unmount_slack() now recognizes user defined mount point. [efnats]
-  - Add feature to utilize slack space on HDDs. [efnats]
-  - Clean up mountdirs upon unmounting. [efnats]
-  - Renamed chiamount to gardenmount. Path variable can now be directly passed to the `--mount` argument. [efnats]
-  - Added chiamount. [efnats]
+### chiainit
+- Added support for overlapping drive ranges sda-sdaz etc.
+- Support for drive ranges added
+- Removed dd (wipefs is sufficient)
+- Added option `--all` and `--exclude` for drive selection
+- UUID fallback for unknown serial numbers
+- Label function autodetects fstype
+- Added warning for NTFS-3G on Windows
 
-- **install.sh**: 
-  - Tidied up the installer, added function to check against installed systemds files. [efnats]
-  - Introduced migration function. [efnats]
-  - Automatically download the latest version of mergerfs from github or fall back to package maintainers version. [efnats]
-  - Installer downloads from madmax repo now. [efnats]
-  - Nicer UI for installer. [efnats]
-  - Updated installer to account for new systemd services. [efnats]
-  - We have an installer script! [efnats]
+### gardenmount
+- Improve Disk Space Validation for btrfs min_size (131MB)
+- Updated unmount_slack() recognizes user defined mount point
+- Add slack space feature for HDDs
+- Clean up mountdirs upon unmounting
+- Renamed chiamount to gardenmount
 
-- **plotsink**: 
-  - plotsink.service Should wait for garden-mount before running. [efnats]
-  - Using taco_list now to generate list of drives. [efnats]
-  - Added plotsink.sh. [efnats]
+### plot_counter
+- New metrics: eTiB, Plots/Second
+- Support for directory and label based scanning
+- Data and plots written counter
+- Command line parameters
 
-- **taco_list**: 
-  - Added format option csv. [efnats]
-  - Fixed and improved. This went broken in commit 0f82d01 unnoticed. [efnats]
-  - Added taco_list. [efnats]
+### plot_over
+- Systemd service support with config file
+- Support for Gigahorse compression 11-15 and Bladebit
+- Timestamps and logging, respect immutable flag
+- `--dry-run` mode
 
-- **other**: 
-  - CHIA is now the default label for plot_over and plot_mover. Please consider relabelling your drives. [efnats]
+### plot_starter
+- Full cuda_plot options support
+
+### plot_timer
+- `--interval` command line argument
+- Grouping by compression level
+- Average for phase 1-4
+
+### cropgains
+- Major refactor with more metrics
+- Timezone info
+
+### plotsink
+- Using taco_list to generate drive list
+
+### taco_list
+- CSV format option
+
+### install.sh
+- Migration function
+- Auto-download latest mergerfs from GitHub
