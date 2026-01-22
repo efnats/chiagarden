@@ -101,7 +101,7 @@ Drive        Size     Label            FS      Temp   Hours    Realloc  Status
 Found 3 drives (3 labeled, 0 unlabeled)
 ```
 
-**--init with progress:**
+**--init:**
 ```
 [1/32] Drive /dev/sda [14.6T]
   ✔ /dev/sda wiping...... ok
