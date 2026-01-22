@@ -20,7 +20,7 @@ ChiaGarden uses **drive labels** to identify your farm drives. Every drive gets 
 1. **[chiainit](chiainit/)** – Label existing drives, or mass-format new ones. Uses serial numbers for unique labels.
 2. **[gardenmount](gardenmount/)** – Mount all `CHIA-*` drives and combine them into a single filesystem at `/mnt/garden/` using mergerfs. Also recovers slack space from partially-filled drives.
 
-The result: **one path, all your storage.** Your plotting tools, Chia harvester, and scripts just use `/mnt/garden/`— no need to know about individual drives.
+The result: **one path, all your storage.** Your plotting tools, Chia harvester, and scripts just use `/mnt/garden/`- no need to know about individual drives.
 
 The other ChiaGarden tools use the label pattern internally for drive-specific operations (like keeping N drives free for replotting).
 
