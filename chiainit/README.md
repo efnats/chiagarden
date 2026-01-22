@@ -79,7 +79,7 @@ chiainit --log --fstype xfs --init sda-sdz
 
 ## Output Examples
 
-**--list:**
+**--list**
 ```
 Drive        Size     Label            Filesystem   Serial
 -----        ----     -----            ----------   ------
@@ -90,7 +90,7 @@ Drive        Size     Label            Filesystem   Serial
 Found 3 drives (2 labeled, 1 unlabeled)
 ```
 
-**--list --smart:**
+**--list --smart**
 ```
 Drive        Size     Label            FS      Temp   Hours    Realloc  Status
 -----        ----     -----            --      ----   -----    -------  ------
@@ -101,7 +101,7 @@ Drive        Size     Label            FS      Temp   Hours    Realloc  Status
 Found 3 drives (3 labeled, 0 unlabeled)
 ```
 
-**--init:**
+**--init**
 ```
 [1/32] Drive /dev/sda [14.6T]
   ✔ /dev/sda wiping...... ok
